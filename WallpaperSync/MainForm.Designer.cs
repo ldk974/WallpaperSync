@@ -9,6 +9,8 @@ namespace WallpaperSync
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.FlowLayoutPanel flpGrid;
         private System.Windows.Forms.CheckBox chkShowPreviews;
+        private System.Windows.Forms.Button btnApplyFromFile;
+        private System.Windows.Forms.Button btnApplyFromUrl;
         private System.Windows.Forms.Button btnRefresh;
         private System.Windows.Forms.Button btnUndo;
         private System.Windows.Forms.Label lblStatus;
@@ -20,6 +22,8 @@ namespace WallpaperSync
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             flpGrid = new FlowLayoutPanel();
             chkShowPreviews = new CheckBox();
+            btnApplyFromFile = new Button();
+            btnApplyFromUrl = new Button();
             btnRefresh = new Button();
             btnUndo = new Button();
             lblStatus = new Label();
@@ -34,12 +38,12 @@ namespace WallpaperSync
             // 
             // flpGrid
             // 
-            flpGrid.Dock = DockStyle.Fill;
             flpGrid.AutoScroll = true;
             flpGrid.BackColor = Color.FromArgb(30, 31, 34);
-            flpGrid.Location = new Point(12, 42);
+            flpGrid.Dock = DockStyle.Fill;
+            flpGrid.Location = new Point(12, 0);
             flpGrid.Name = "flpGrid";
-            flpGrid.Size = new Size(760, 380);
+            flpGrid.Size = new Size(760, 382);
             flpGrid.TabIndex = 0;
             // 
             // chkShowPreviews
@@ -55,6 +59,26 @@ namespace WallpaperSync
             chkShowPreviews.Text = "Mostrar prévias";
             chkShowPreviews.UseVisualStyleBackColor = true;
             chkShowPreviews.CheckedChanged += chkShowPreviews_CheckedChanged;
+            // 
+            // btnApplyFromFile
+            // 
+            btnApplyFromFile.Location = new Point(252, 8);
+            btnApplyFromFile.Name = "btnApplyFromFile";
+            btnApplyFromFile.Size = new Size(150, 32);
+            btnApplyFromFile.TabIndex = 5;
+            btnApplyFromFile.Text = "Aplicar do arquivo";
+            btnApplyFromFile.UseVisualStyleBackColor = true;
+            btnApplyFromFile.Click += BtnApplyFromFile_Click;
+            // 
+            // btnApplyFromUrl
+            // 
+            btnApplyFromUrl.Location = new Point(408, 8);
+            btnApplyFromUrl.Name = "btnApplyFromUrl";
+            btnApplyFromUrl.Size = new Size(150, 32);
+            btnApplyFromUrl.TabIndex = 4;
+            btnApplyFromUrl.Text = "Aplicar da URL";
+            btnApplyFromUrl.UseVisualStyleBackColor = true;
+            btnApplyFromUrl.Click += BtnApplyFromUrl_Click;
             // 
             // btnRefresh
             // 
@@ -103,6 +127,8 @@ namespace WallpaperSync
             panelTop.Controls.Add(btnUndo);
             panelTop.Controls.Add(btnRefresh);
             panelTop.Controls.Add(chkShowPreviews);
+            panelTop.Controls.Add(btnApplyFromUrl);
+            panelTop.Controls.Add(btnApplyFromFile);
             panelTop.Dock = DockStyle.Top;
             panelTop.Location = new Point(0, 0);
             panelTop.Name = "panelTop";
@@ -117,9 +143,9 @@ namespace WallpaperSync
             panelList.Dock = DockStyle.Fill;
             panelList.Location = new Point(0, 50);
             panelList.Name = "panelList";
+            panelList.Padding = new Padding(12, 0, 12, 0);
             panelList.Size = new Size(784, 382);
             panelList.TabIndex = 1;
-            panelList.Padding = new Padding(12, 0, 12, 0);
             // 
             // listWallpapers
             // 
@@ -129,10 +155,10 @@ namespace WallpaperSync
             listWallpapers.Font = new Font("Segoe UI", 10F);
             listWallpapers.ForeColor = Color.White;
             listWallpapers.IntegralHeight = false;
-            listWallpapers.ItemHeight = 30;
-            listWallpapers.Location = new Point(0, 0);
+            listWallpapers.ItemHeight = 17;
+            listWallpapers.Location = new Point(12, 0);
             listWallpapers.Name = "listWallpapers";
-            listWallpapers.Size = new Size(784, 382);
+            listWallpapers.Size = new Size(760, 382);
             listWallpapers.TabIndex = 0;
             listWallpapers.Visible = false;
             listWallpapers.DoubleClick += listWallpapers_DoubleClick;
