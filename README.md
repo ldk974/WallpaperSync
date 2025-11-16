@@ -66,6 +66,7 @@ Se você não concorda: **não execute** o programa.
 |---------------------------------------|:-----------------:|:-------------:|
 | Aplicar papel de parede               | ✔️                | ✔️            |
 | Listagem de papeis de paredes         | ✔️                | ✔️            |
+| Imagens próprias                      | ⚠️ (apenas url    | ✔️            |
 | Prévias                               | ❌                | ✔️            |
 | Fallback automático (TranscodedWallpaper) | ✔️            | ✔️            |
 | Interface gráfica                     | ❌                | ✔️            |
