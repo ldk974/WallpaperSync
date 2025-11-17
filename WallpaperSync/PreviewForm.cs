@@ -22,6 +22,22 @@ namespace WallpaperSync
 
         private void PreviewForm_Load(object sender, EventArgs e)
         {
+            ThemeManager.ApplyTheme(this);
+
+            bool dark = ThemeManager.IsDarkModeEnabled();
+            bool transparency = SystemTransparency.IsTransparencyEnabled();
+            bool acrylicSupported = AcrylicEffect.IsAcrylicSupported();
+
+            if (dark && transparency && acrylicSupported)
+            {
+                AcrylicEffect.ApplyAcrylic(this.Handle);
+                DebugLogger.Log("PreviewForm: Acrylic aplicado.");
+            }
+            else
+            {
+                DebugLogger.Log("PreviewForm: Acrylic não aplicado (modo claro, ou sem transparência, ou sem suporte).");
+            }
+
             try
             {
                 // Carrega a imagem sem manter o arquivo bloqueado

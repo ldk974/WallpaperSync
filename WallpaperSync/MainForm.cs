@@ -71,11 +71,22 @@ namespace WallpaperSync
         }
         private async void MainForm_Load(object sender, EventArgs e)
         {
-#if DEBUG
-            var logForm = new DebugLogForm();
-            logForm.Show();
-            DebugLogger.Log("Aplicativo iniciado em modo DEBUG.");
-#endif
+            ThemeManager.ApplyTheme(this);
+
+            bool dark = ThemeManager.IsDarkModeEnabled();
+            bool transparency = SystemTransparency.IsTransparencyEnabled();
+            bool acrylicSupported = AcrylicEffect.IsAcrylicSupported();
+
+            if (dark && transparency && acrylicSupported)
+            {
+                AcrylicEffect.ApplyAcrylic(this.Handle);
+                DebugLogger.Log("MainForm: Acrylic aplicado.");
+            }
+            else
+            {
+                DebugLogger.Log("MainForm: Acrylic não aplicado (modo claro, ou sem transparência, ou sem suporte).");
+            }
+
             try
             {
                 uiService.ToggleControls(false);
@@ -140,48 +151,37 @@ namespace WallpaperSync
             }
         }
 
-        private async void BtnApplyFromFile_Click(object sender, EventArgs e)
+        private async void listWallpapers_DoubleClick(object sender, EventArgs e)
         {
-            using var ofd = new OpenFileDialog { Filter = "Imagens|*.jpg;*.jpeg;*.png;*.bmp", Title = "Escolher imagem" };
-            if (ofd.ShowDialog() != DialogResult.OK) return;
+            if (listWallpapers.SelectedItem is not ImageEntry img) return;
             try
             {
-                var imageTransformer = new ImageTransformer();
-                var backupService = new BackupService(backupDir);
-                var wallpaperApplier = new WallpaperApplier(transcodedPath);
-                var workflow = new WallpaperWorkflow(imageTransformer, backupService, wallpaperApplier, transcodedPath);
+                string path = await imageDownloader.DownloadOriginalAsync(img);
+                using var preview = new PreviewForm(img.Name, path);
+                var res = preview.ShowDialog(this);
+                if (res == DialogResult.OK)
+                {
+                    var imageTransformer = new ImageTransformer();
+                    var backupService = new BackupService(backupDir);
+                    var wallpaperApplier = new WallpaperApplier(transcodedPath);
+                    var workflow = new WallpaperWorkflow(imageTransformer, backupService, wallpaperApplier, transcodedPath);
 
-                bool applied = await workflow.ApplyAsync(ofd.FileName);
-                if (applied) DebugLogger.Log("MainForm: aplicado de arquivo com sucesso.");
+                    var applied = await workflow.ApplyAsync(path);
+                    if (applied)
+                    {
+                        DebugLogger.Log("MainForm: Imagem aplicada com sucesso.");
+                    }
+                }
             }
             catch (Exception ex)
             {
-                DebugLogger.Log($"ApplyFromFile erro: {ex.Message}");
-                MessageBox.Show($"Erro ao aplicar: {ex.Message}");
+                DebugLogger.Log($"listWallpapers_DoubleClick: {ex.Message}");
+                MessageBox.Show($"Erro: {ex.Message}");
             }
-        }
-
-        private async void BtnApplyFromUrl_Click(object sender, EventArgs e)
-        {
-            string url = Microsoft.VisualBasic.Interaction.InputBox("Digite a URL da imagem:", "Aplicar wallpaper da URL", "");
-            if (string.IsNullOrWhiteSpace(url)) return;
-
-            try
+            finally
             {
-                var saved = await imageDownloader.DownloadCustomAsync(url);
-
-                var imageTransformer = new ImageTransformer();
-                var backupService = new BackupService(backupDir);
-                var wallpaperApplier = new WallpaperApplier(transcodedPath);
-                var workflow = new WallpaperWorkflow(imageTransformer, backupService, wallpaperApplier, transcodedPath);
-
-                bool applied = await workflow.ApplyAsync(saved);
-                if (applied) DebugLogger.Log("MainForm: aplicado de URL com sucesso.");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Log($"ApplyFromUrl erro: {ex.Message}");
-                MessageBox.Show($"Erro ao aplicar: {ex.Message}");
+                uiService.ToggleControls(true);
+                uiService.SetStatus($"Catálogo carregado ({Images.Count} imagens)");
             }
         }
 
@@ -245,22 +245,7 @@ namespace WallpaperSync
             finally
             {
                 thumbnailService.Dispose();
-            }
-        }
-
-        private async void listWallpapers_DoubleClick(object sender, EventArgs e)
-        {
-            if (listWallpapers.SelectedItem is not ImageEntry img) return;
-            try
-            {
-                string path = await imageDownloader.DownloadOriginalAsync(img);
-                using var preview = new PreviewForm(img.Name, path);
-                preview.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Log($"Erro ao abrir preview: {ex.Message}");
-                MessageBox.Show($"Erro: {ex.Message}");
+                Application.Exit();
             }
         }
 
