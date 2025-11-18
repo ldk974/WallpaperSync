@@ -42,7 +42,7 @@ namespace WallpaperSync
             FormClosing += StartupForm_Closing;
         }
 
-        private void StartupForm_Load(object sender, EventArgs e)
+        private async void StartupForm_Load(object sender, EventArgs e)
         {
 #if DEBUG
             var logForm = new DebugLogForm();
@@ -50,20 +50,6 @@ namespace WallpaperSync
             DebugLogger.Log("Aplicativo iniciado em modo DEBUG.");
 #endif
             ThemeManager.ApplyTheme(this);
-
-            bool dark = ThemeManager.IsDarkModeEnabled();
-            bool transparency = SystemTransparency.IsTransparencyEnabled();
-            bool acrylicSupported = AcrylicEffect.IsAcrylicSupported();
-
-            if (dark && transparency && acrylicSupported)
-            {
-                AcrylicEffect.ApplyAcrylic(this.Handle);
-                DebugLogger.Log("StartupForm: Acrylic aplicado.");
-            }
-            else
-            {
-                DebugLogger.Log("StartupForm: Acrylic não aplicado (modo claro, ou sem transparência, ou sem suporte).");
-            }
         }
 
         private void StartupForm_Closing(object sender, FormClosingEventArgs e)

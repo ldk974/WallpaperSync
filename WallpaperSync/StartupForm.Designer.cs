@@ -10,19 +10,20 @@ namespace WallpaperSync
         private System.Windows.Forms.Button btnDefault;
         private System.Windows.Forms.Button btnUseFile;
         private System.Windows.Forms.Button btnUseUrl;
-        private System.Windows.Forms.Label lblTitle;
 
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(StartupForm));
             btnDefault = new Button();
             btnUseFile = new Button();
             btnUseUrl = new Button();
-            lblTitle = new Label();
+            pictureBox1 = new PictureBox();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
             // 
             // btnDefault
             // 
-            btnDefault.Location = new Point(44, 58);
+            btnDefault.Location = new Point(43, 223);
             btnDefault.Margin = new Padding(3, 2, 3, 2);
             btnDefault.Name = "btnDefault";
             btnDefault.Size = new Size(228, 38);
@@ -33,7 +34,7 @@ namespace WallpaperSync
             // 
             // btnUseFile
             // 
-            btnUseFile.Location = new Point(44, 100);
+            btnUseFile.Location = new Point(43, 265);
             btnUseFile.Margin = new Padding(3, 2, 3, 2);
             btnUseFile.Name = "btnUseFile";
             btnUseFile.Size = new Size(228, 38);
@@ -44,7 +45,7 @@ namespace WallpaperSync
             // 
             // btnUseUrl
             // 
-            btnUseUrl.Location = new Point(44, 142);
+            btnUseUrl.Location = new Point(43, 307);
             btnUseUrl.Margin = new Padding(3, 2, 3, 2);
             btnUseUrl.Name = "btnUseUrl";
             btnUseUrl.Size = new Size(228, 38);
@@ -53,33 +54,35 @@ namespace WallpaperSync
             btnUseUrl.UseVisualStyleBackColor = true;
             btnUseUrl.Click += btnUseUrl_Click;
             // 
-            // lblTitle
+            // pictureBox1
             // 
-            lblTitle.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-            lblTitle.Location = new Point(12, 18);
-            lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(294, 38);
-            lblTitle.TabIndex = 2;
-            lblTitle.Text = "WallpaperSync";
-            lblTitle.TextAlign = ContentAlignment.MiddleCenter;
+            pictureBox1.Image = (Image)resources.GetObject("pictureBox1.Image");
+            pictureBox1.Location = new Point(59, 12);
+            pictureBox1.Name = "pictureBox1";
+            pictureBox1.Size = new Size(200, 200);
+            pictureBox1.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBox1.TabIndex = 5;
+            pictureBox1.TabStop = false;
             // 
             // StartupForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(30, 31, 34);
-            ClientSize = new Size(315, 195);
+            ClientSize = new Size(315, 358);
+            Controls.Add(pictureBox1);
             Controls.Add(btnUseUrl);
             Controls.Add(btnUseFile);
-            Controls.Add(lblTitle);
             Controls.Add(btnDefault);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             Margin = new Padding(3, 2, 3, 2);
             MaximizeBox = false;
             Name = "StartupForm";
             StartPosition = FormStartPosition.CenterScreen;
-            Text = "WallpaperSync Início";
+            Text = "WallpaperSync";
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             ResumeLayout(false);
         }
+        private PictureBox pictureBox1;
     }
 }

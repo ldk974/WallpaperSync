@@ -11,52 +11,61 @@ namespace WallpaperSync
         private readonly WallpaperApplier applier;
         private readonly string transcodedPath;
 
-        public WallpaperWorkflow(ImageTransformer transformer, BackupService backupService, WallpaperApplier applier, string transcodedPath)
+        public WallpaperWorkflow(
+            ImageTransformer transformer,
+            BackupService backupService,
+            WallpaperApplier applier,
+            string transcodedPath)
         {
             this.transformer = transformer ?? throw new ArgumentNullException(nameof(transformer));
             this.backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
             this.applier = applier ?? throw new ArgumentNullException(nameof(applier));
             this.transcodedPath = transcodedPath ?? throw new ArgumentNullException(nameof(transcodedPath));
         }
+
         public async Task<bool> ApplyAsync(string inputPath)
         {
+            string? tempJpeg = null;
+
             try
             {
                 DebugLogger.Log("WallpaperWorkflow.ApplyAsync iniciando.");
                 DebugLogger.Log($"Imagem de entrada: {inputPath}");
 
-                // carrega imagem
+                // carrega imagem original
                 using var original = transformer.LoadBitmapUnlocked(inputPath);
                 DebugLogger.Log($"Imagem carregada: {original.Width}x{original.Height}");
 
-                // garante 16:9
+                // arruma aspect ratio
                 using var img16 = transformer.EnsureImageIs16by9(original);
                 DebugLogger.Log($"Após EnsureImageIs16by9: {img16.Width}x{img16.Height}");
 
-                // resize se necessário
+                // arruma tamanho se necessário
                 using var finalBmp = transformer.ResizeIfNeeded(img16);
                 DebugLogger.Log($"Após ResizeIfNeeded: {finalBmp.Width}x{finalBmp.Height}");
 
                 // salva JPEG temporário
-                string tempJpeg = transformer.SaveBitmapToTempJpeg(finalBmp);
+                tempJpeg = transformer.SaveBitmapToTempJpeg(finalBmp);
                 DebugLogger.Log($"Imagem final salva temporariamente em: {tempJpeg}");
 
-                // backup do transcoded original
+                // cria backup do TranscodedWallpaper original
                 string backup = backupService.CreateBackupIfExists(transcodedPath);
                 if (!string.IsNullOrEmpty(backup))
-                {
                     DebugLogger.Log($"Backup criado: {backup}");
-                }
                 else
-                {
                     DebugLogger.Log("Nenhum transcodedPath existente para backup.");
+
+                // copia o temp -> transcoded
+                bool copyOk = TryCopyWithRetry(tempJpeg, transcodedPath, retries: 5, delayMs: 40);
+                if (!copyOk)
+                {
+                    DebugLogger.Log("FALHA ao copiar para transcodedPath.");
+                    return false;
                 }
 
-                // copia temporário -> transcodedPath
-                File.Copy(tempJpeg, transcodedPath, true);
                 DebugLogger.Log($"Arquivo copiado para transcodedPath: {transcodedPath}");
 
-                // tenta aplicar via API
+                // tenta aplicar pela API
                 DebugLogger.Log("Tentando aplicar via API...");
                 bool apiOk = applier.ApplyViaApi(transcodedPath);
                 DebugLogger.Log($"Resultado da API: {(apiOk ? "Sucesso" : "FALHA")}");
@@ -66,11 +75,10 @@ namespace WallpaperSync
                     DebugLogger.Log("API falhou — tentando fallback via TranscodedWallpaper.");
                     bool fallbackOk = applier.ApplyViaTranscodedWallpaper(transcodedPath);
                     DebugLogger.Log($"Resultado do fallback TranscodedWallpaper: {(fallbackOk ? "Sucesso" : "FALHA")}");
-                    FileExtensions.DeleteIfExists(tempJpeg);
+                    tempJpeg.DeleteIfExists();
                     return fallbackOk;
                 }
 
-                FileExtensions.DeleteIfExists(tempJpeg);
                 DebugLogger.Log("Aplicação concluída com SUCESSO via API.");
                 return true;
             }
@@ -79,8 +87,36 @@ namespace WallpaperSync
                 DebugLogger.Log($"ERRO no workflow: {ex}");
                 return false;
             }
+            finally
+            {
+                tempJpeg?.DeleteIfExists();
+            }
+        }
+
+        private bool TryCopyWithRetry(string src, string dst, int retries, int delayMs)
+        {
+            for (int i = 0; i < retries; i++)
+            {
+                try
+                {
+                    File.Copy(src, dst, overwrite: true);
+                    return true;
+                }
+                catch (IOException ex)
+                {
+                    DebugLogger.Log($"Retry {i + 1}/{retries} ao copiar transcoded: {ex.Message}");
+                    Task.Delay(delayMs).Wait();
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Log($"Erro grave ao copiar transcoded: {ex}");
+                    return false;
+                }
+            }
+            return false;
         }
     }
+
     internal static class FileExtensions
     {
         public static void DeleteIfExists(this string path)
@@ -89,7 +125,10 @@ namespace WallpaperSync
             {
                 if (File.Exists(path)) File.Delete(path);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                DebugLogger.Log($"Falha ao deletar {path}: {ex.Message}");
+            }
         }
     }
 }

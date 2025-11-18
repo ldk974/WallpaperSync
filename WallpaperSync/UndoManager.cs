@@ -1,35 +1,90 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
+using static WallpaperSync.BackupService;
 
 namespace WallpaperSync
 {
     public class UndoManager
     {
         private readonly string backupDir;
-        public UndoManager(string backupDirectory)
+
+        public UndoManager(string backupDir)
         {
-            backupDir = backupDirectory ?? throw new ArgumentNullException(nameof(backupDirectory));
-            Directory.CreateDirectory(backupDir);
+            this.backupDir = backupDir ?? throw new ArgumentNullException(nameof(backupDir));
+            Directory.CreateDirectory(this.backupDir);
+        }
+        public string? GetLastBackup()
+        {
+            try
+            {
+                var files = Directory
+                    .EnumerateFiles(backupDir, "*.bak", SearchOption.TopDirectoryOnly)
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.CreationTimeUtc)
+                    .ToList();
+
+                return files.Count > 0 ? files[0].FullName : null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log($"UndoManager: erro ao listar backups: {ex.Message}");
+                return null;
+            }
         }
 
-        public string CreateBackupIfExists(string existingFilePath)
+        public IEnumerable<BackupInfo> GetBackups()
         {
-            if (string.IsNullOrWhiteSpace(existingFilePath) || !File.Exists(existingFilePath)) return null;
-            string backupTarget = Path.Combine(backupDir, "TranscodedWallpaper_original_" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak");
-            File.Copy(existingFilePath, backupTarget, false);
-            DebugLogger.Log($"UndoManager: backup criado {backupTarget}");
-            return backupTarget;
+            var files = Directory.Exists(backupDir)
+                ? Directory.GetFiles(backupDir, "*.bak")
+                : Array.Empty<string>();
+
+            var list = files.Select(path =>
+            {
+                var info = new FileInfo(path);
+                var created = TryParseTimestampFromName(info.Name, out var dt) ? dt : info.LastWriteTime;
+                return new BackupInfo
+                {
+                    Path = path,
+                    Created = created,
+                    SizeBytes = info.Length
+                };
+            })
+            .OrderByDescending(b => b.Created)
+            .ToList();
+
+            return list;
         }
 
-        public string GetLastBackup()
+        private bool TryParseTimestampFromName(string name, out DateTime dt)
         {
-            var files = Directory.GetFiles(backupDir, "TranscodedWallpaper_original_*.bak").OrderByDescending(f => f).ToArray();
-            return files.Length > 0 ? files[0] : null;
+            dt = DateTime.MinValue;
+            try
+            {
+                // espera TranscodedWallpaper_original_yyyyMMddHHmmss.bak
+                var p = name.Split('_').Last(); // yyyyMMddHHmmss.bak
+                p = p.Replace(".bak", "");
+                if (p.Length >= 14)
+                {
+                    var y = int.Parse(p.Substring(0, 4));
+                    var M = int.Parse(p.Substring(4, 2));
+                    var d = int.Parse(p.Substring(6, 2));
+                    var hh = int.Parse(p.Substring(8, 2));
+                    var mm = int.Parse(p.Substring(10, 2));
+                    var ss = int.Parse(p.Substring(12, 2));
+                    dt = new DateTime(y, M, d, hh, mm, ss);
+                    return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         public bool Restore(string backupPath, string transcodedPath)
         {
-            if (string.IsNullOrWhiteSpace(backupPath) || !File.Exists(backupPath)) return false;
+            if (string.IsNullOrWhiteSpace(backupPath) || !File.Exists(backupPath))
+                return false;
+
             try
             {
                 File.Copy(backupPath, transcodedPath, true);
@@ -40,6 +95,42 @@ namespace WallpaperSync
             {
                 DebugLogger.Log($"UndoManager: falha restore: {ex.Message}");
                 return false;
+            }
+        }
+
+        public bool Delete(string backupPath, out string error)
+        {
+            error = null;
+            try
+            {
+                File.Delete(backupPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        public int DeleteAll(out string error)
+        {
+            error = null;
+            int deleted = 0;
+            try
+            {
+                var backups = GetBackups().ToArray();
+                foreach (var b in backups)
+                {
+                    File.Delete(b.Path);
+                    deleted++;
+                }
+                return deleted;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return deleted;
             }
         }
     }

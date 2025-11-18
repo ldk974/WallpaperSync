@@ -1,35 +1,58 @@
-﻿using System.Drawing;
+﻿using Microsoft.Win32;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace WallpaperSync
 {
     public static class ThemeManager
     {
-        public static event Action<bool> OnThemeChanged;
-        public static bool IsDarkModeEnabled() => SystemTheme.IsDarkMode();
+            // retorna true se Windows tiver no modo escuro.
+        public static bool IsDarkMode()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                false
+                );
+
+                if (key == null) return false;
+
+                var value = key.GetValue("AppsUseLightTheme");
+
+                // se Windows ta em Dark Mode, AppsUseLightTheme = 0
+                return value is int v && v == 0;
+            }
+            catch
+            {
+                // fallback pra claro
+                return false;
+            }
+        }
 
         public static void ApplyTheme(Form form)
         {
-            bool dark = SystemTheme.IsDarkMode();
-            bool acrylicSupported = AcrylicEffect.IsAcrylicSupported() && SystemTransparency.IsTransparencyEnabled();
+            bool dark = IsDarkMode();
 
-            form.BackColor = dark ? (acrylicSupported ? Color.Black : Color.FromArgb(32, 32, 32)) : Color.FromArgb(239, 244, 249);
-
-            SetControlsBackColor(form.Controls, dark, acrylicSupported);
+            form.BackColor = dark ? Color.FromArgb(28, 32, 40) : Color.FromArgb(239, 244, 249);
+            SetControlsBackColor(form.Controls, dark);
         }
 
-        private static void SetControlsBackColor(Control.ControlCollection controls, bool dark, bool acrylicEnabled)
+        private static void SetControlsBackColor(Control.ControlCollection controls, bool dark)
         {
             foreach (Control ctrl in controls)
             {
                 switch (ctrl)
                 {
+                    case Label:
+                    case CheckBox:
                     case ListBox:
+                    case ListView:
                     case FlowLayoutPanel:
                     case Panel:
                         if (dark)
                         {
-                            ctrl.BackColor = acrylicEnabled ? Color.Black : Color.FromArgb(32, 32, 32);
+                            ctrl.BackColor =  Color.FromArgb(28, 32, 40);
                             ctrl.ForeColor = Color.White;
                         }
                         else
@@ -39,13 +62,12 @@ namespace WallpaperSync
                         }
                         break;
                     default:
-                        ctrl.BackColor = dark ? (acrylicEnabled ? Color.Black : Color.FromArgb(32, 32, 32)) : Color.FromArgb(239, 244, 249);
-                        ctrl.ForeColor = dark ? Color.White : Color.Black;
+                        ctrl.ForeColor = Color.Black;
                         break;
                 }
 
                 if (ctrl.HasChildren)
-                    SetControlsBackColor(ctrl.Controls, dark, acrylicEnabled);
+                    SetControlsBackColor(ctrl.Controls, dark);
             }
         }
     }

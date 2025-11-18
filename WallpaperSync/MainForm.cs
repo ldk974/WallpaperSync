@@ -1,18 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.DirectoryServices;
 using System.Drawing;
-using System.Drawing.Imaging;
+using System.Drawing.Interop;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Security.Policy;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using WallpaperSync;
 
 namespace WallpaperSync
 {
@@ -24,7 +21,7 @@ namespace WallpaperSync
         private readonly string backupDir;
         private readonly string transcodedPath;
 
-        private readonly HttpClient http;
+        private HttpClient http;
         private CatalogLoader catalogLoader;
         private ImageDownloader imageDownloader;
         private ThumbnailService thumbnailService;
@@ -50,7 +47,6 @@ namespace WallpaperSync
                 @"Microsoft\Windows\Themes\TranscodedWallpaper"
             );
 
-
             Directory.CreateDirectory(cacheDir);
             Directory.CreateDirectory(backupDir);
 
@@ -72,20 +68,6 @@ namespace WallpaperSync
         private async void MainForm_Load(object sender, EventArgs e)
         {
             ThemeManager.ApplyTheme(this);
-
-            bool dark = ThemeManager.IsDarkModeEnabled();
-            bool transparency = SystemTransparency.IsTransparencyEnabled();
-            bool acrylicSupported = AcrylicEffect.IsAcrylicSupported();
-
-            if (dark && transparency && acrylicSupported)
-            {
-                AcrylicEffect.ApplyAcrylic(this.Handle);
-                DebugLogger.Log("MainForm: Acrylic aplicado.");
-            }
-            else
-            {
-                DebugLogger.Log("MainForm: Acrylic não aplicado (modo claro, ou sem transparência, ou sem suporte).");
-            }
 
             try
             {
@@ -135,7 +117,7 @@ namespace WallpaperSync
                     var applied = await workflow.ApplyAsync(path);
                     if (applied)
                     {
-                        DebugLogger.Log("MainForm: Imagem aplicada com sucesso.");
+                        DebugLogger.Log("MainForm OTC: Imagem aplicada com sucesso.");
                     }
                 }
             }
@@ -169,7 +151,7 @@ namespace WallpaperSync
                     var applied = await workflow.ApplyAsync(path);
                     if (applied)
                     {
-                        DebugLogger.Log("MainForm: Imagem aplicada com sucesso.");
+                        DebugLogger.Log("MainForm LWP: Imagem aplicada com sucesso.");
                     }
                 }
             }
@@ -209,24 +191,8 @@ namespace WallpaperSync
         private void btnUndo_Click(object sender, EventArgs e)
         {
             DebugLogger.Log("Usuário clicou em UNDO.");
-            try
-            {
-                var last = undoManager.GetLastBackup();
-                if(string.IsNullOrEmpty(last))
-                {
-                    MessageBox.Show("Nenhum backup disponível.");
-                    return;
-                }
-
-                var restored = undoManager.Restore(last, transcodedPath);
-                var ok = WallpaperManager.SetWallpaper(transcodedPath);
-                DebugLogger.Log(ok ? "Undo: wallpaper restaurado com sucesso." : "Undo: restaurado mas API retornou falha.");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Log($"Erro ao restaurar wallpaper: {ex.Message}");
-                MessageBox.Show($"Erro ao restaurar: {ex.Message}");
-            }
+            var restoreForm = new RestoreForm(undoManager, transcodedPath);
+            restoreForm.Show(this);
         }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -257,13 +223,13 @@ namespace WallpaperSync
 
             if (chkShowPreviews.Checked)
             {
-                DebugLogger.Log("Mostrando grade");
+                DebugLogger.Log($"RefreshView: mostrando lista com {Images.Count} itens");
                 await gridRenderer.RenderAsync(Images, lblStatus);
             }
             else
             {
                 PopulateList();
-                DebugLogger.Log("Mostrando lista");
+                DebugLogger.Log($"RefreshView: mostrando lista com {Images.Count} itens");
             }
         }
 
@@ -319,13 +285,40 @@ namespace WallpaperSync
         private const int SPIF_UPDATEINIFILE = 0x01;
         private const int SPIF_SENDWININICHANGE = 0x02;
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern bool SystemParametersInfo(int action, int uParam, string vParam, int winIni);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool SystemParametersInfo(
+            int uiAction,
+            int uiParam,
+            string pvParam,
+            int fWinIni);
 
         public static bool SetWallpaper(string file)
         {
-            return SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, file,
-                SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
+            try
+            {
+                file = Path.GetFullPath(file);
+
+                DebugLogger.Log($"WallpaperManager.SetWallpaper: tentando aplicar '{file}'");
+
+                bool ok = SystemParametersInfo(
+                    SPI_SETDESKWALLPAPER,
+                    0,
+                    file,
+                    SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
+
+                if (!ok)
+                {
+                    int err = Marshal.GetLastWin32Error();
+                    DebugLogger.Log($"SystemParametersInfo falhou. Win32Error={err}");
+                }
+
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Log($"WallpaperManager.SetWallpaper: exceção: {ex.Message}");
+                return false;
+            }
         }
     }
 }

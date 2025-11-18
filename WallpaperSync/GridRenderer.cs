@@ -1,16 +1,20 @@
 ﻿using System;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace WallpaperSync
 {
-    public class GridRenderer
+    public class GridRenderer : IDisposable
     {
         private readonly FlowLayoutPanel flp;
         private readonly ThumbnailService thumbService;
         private readonly Func<ImageEntry, Task> onClick;
+
+        private CancellationTokenSource? renderCts;
 
         public GridRenderer(FlowLayoutPanel flpPanel, ThumbnailService thumbService, Func<ImageEntry, Task> onClickCallback)
         {
@@ -19,49 +23,104 @@ namespace WallpaperSync
             this.onClick = onClickCallback ?? throw new ArgumentNullException(nameof(onClickCallback));
         }
 
-        public async Task RenderAsync(System.Collections.Generic.List<ImageEntry> images, Label lblStatus)
+        public async Task RenderAsync(List<ImageEntry> images, Label lblStatus)
         {
-            flp.SuspendLayout();
-            flp.Controls.Clear();
+            // cancela render anterior, se existir
+            renderCts?.Cancel();
+            renderCts = new CancellationTokenSource();
+            var ct = renderCts.Token;
 
-            int total = images.Count;
-            int done = 0;
-            var tasks = images.Select(async entry =>
+            lblStatus.InvokeIfRequired(() => lblStatus.Text = "Carregando thumbnails...");
+
+            try
             {
-                var panel = CreateThumbnailCardPlaceholder(entry);
-                flp.InvokeIfRequired(() => flp.Controls.Add(panel));
-
-                try
+                // limpa UI no UI thread
+                flp.InvokeIfRequired(() =>
                 {
-                    var thumbPath = await thumbService.GetOrCreateThumbPathAsync(entry);
-                    var img = thumbService.LoadThumbIntoMemory(thumbPath);
-                    var pic = panel.Controls.OfType<PictureBox>().FirstOrDefault();
-                    if (pic != null)
+                    foreach (Control c in flp.Controls)
                     {
+                        if (c is Panel p)
+                        {
+                            foreach (var pic in p.Controls.OfType<PictureBox>())
+                                pic.Image?.Dispose();
+                        }
+                        c.Dispose();
+                    }
+
+                    flp.Controls.Clear();
+                    flp.SuspendLayout();
+                });
+
+                // cria todos os placeholders no UI thread de uma vez
+                Panel[] createdPanels = null!;
+                flp.InvokeIfRequired(() =>
+                {
+                    createdPanels = images.Select(CreateThumbnailCardPlaceholder).ToArray();
+                    flp.Controls.AddRange(createdPanels);
+                    flp.ResumeLayout();
+                });
+
+                int total = images.Count;
+                int done = 0;
+
+                // throttle de status
+                var statusUpdateTask = Task.Run(async () =>
+                {
+                    while (!ct.IsCancellationRequested)
+                    {
+                        await Task.Delay(120, ct);
+                        int d = done;
+                        lblStatus.InvokeIfRequired(() =>
+                            lblStatus.Text = $"Carregando thumbnails... {d}/{total}");
+                    }
+                }, ct);
+
+                // carrega thumbs em paralelo
+                var loadTasks = images.Select(async (entry, idx) =>
+                {
+                    if (ct.IsCancellationRequested) return;
+
+                    try
+                    {
+                        var thumbPath = await thumbService.GetOrCreateThumbPathAsync(entry);
+                        if (!File.Exists(thumbPath)) return;
+
+                        using var tmpImg = thumbService.LoadThumbIntoMemory(thumbPath);
+                        var bmp = new Bitmap(tmpImg);
+
+                        // atualizar UI
+                        var panel = createdPanels[idx];
+                        var pic = panel.Controls.OfType<PictureBox>().FirstOrDefault();
+                        if (pic == null) return;
+
                         pic.InvokeIfRequired(() =>
                         {
                             pic.Image?.Dispose();
-                            pic.Image = new Bitmap(img);
+                            pic.Image = bmp;
                         });
                     }
-                    img.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    DebugLogger.Log($"GridRenderer: erro ao carregar thumb: {ex.Message}");
-                }
-                finally
-                {
-                    System.Threading.Interlocked.Increment(ref done);
-                    var s = $"Carregando thumbnails... {done}/{total}";
-                    lblStatus.InvokeIfRequired(() => lblStatus.Text = s);
-                }
-            }).ToArray();
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.Log($"GridRenderer: erro ao carregar thumbnail: {ex.Message}");
+                    }
+                    finally
+                    {
+                        Interlocked.Increment(ref done);
+                    }
+                });
 
-            await Task.WhenAll(tasks);
+                await Task.WhenAll(loadTasks);
 
-            lblStatus.InvokeIfRequired(() => lblStatus.Text = $"Catálogo carregado ({images.Count} imagens)");
-            flp.ResumeLayout();
+                // cancela status update
+                renderCts.Cancel();
+
+                lblStatus.InvokeIfRequired(() =>
+                    lblStatus.Text = $"Catálogo carregado ({images.Count} imagens)");
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         private Panel CreateThumbnailCardPlaceholder(ImageEntry entry)
@@ -81,7 +140,8 @@ namespace WallpaperSync
                 SizeMode = PictureBoxSizeMode.Zoom,
                 BackColor = Color.FromArgb(0x2F, 0x31, 0x36),
                 Cursor = Cursors.Hand,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Left = 5,
+                Top = 5
             };
 
             var lbl = new Label
@@ -91,18 +151,24 @@ namespace WallpaperSync
                 Width = 150,
                 Height = 40,
                 Top = pic.Bottom + 4,
-                Left = 0,
+                Left = 5,
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9F),
+                Font = new Font("Segoe UI", 9F)
             };
-
-            panel.Controls.Add(pic);
-            panel.Controls.Add(lbl);
 
             pic.Click += async (s, e) => await onClick(entry);
             lbl.Click += async (s, e) => await onClick(entry);
 
+            panel.Controls.Add(pic);
+            panel.Controls.Add(lbl);
+
             return panel;
+        }
+
+        public void Dispose()
+        {
+            renderCts?.Cancel();
+            renderCts?.Dispose();
         }
     }
 }

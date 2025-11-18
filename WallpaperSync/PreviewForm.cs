@@ -24,23 +24,9 @@ namespace WallpaperSync
         {
             ThemeManager.ApplyTheme(this);
 
-            bool dark = ThemeManager.IsDarkModeEnabled();
-            bool transparency = SystemTransparency.IsTransparencyEnabled();
-            bool acrylicSupported = AcrylicEffect.IsAcrylicSupported();
-
-            if (dark && transparency && acrylicSupported)
-            {
-                AcrylicEffect.ApplyAcrylic(this.Handle);
-                DebugLogger.Log("PreviewForm: Acrylic aplicado.");
-            }
-            else
-            {
-                DebugLogger.Log("PreviewForm: Acrylic não aplicado (modo claro, ou sem transparência, ou sem suporte).");
-            }
-
             try
             {
-                // Carrega a imagem sem manter o arquivo bloqueado
+                // carrega a imagem sem travar arquivo
                 using (var img = Image.FromFile(imagePath))
                 {
                     pbPreview.Image = new Bitmap(img);
@@ -48,7 +34,7 @@ namespace WallpaperSync
             }
             catch
             {
-                // mostrar uma mensagem simples se falhar
+                // mostra uma mensagem simples se falhar
                 lblTitle.Text = friendlyName + " (pré-visualização indisponível)";
             }
         }

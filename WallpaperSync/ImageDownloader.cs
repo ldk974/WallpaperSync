@@ -1,7 +1,9 @@
 ﻿using System;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 namespace WallpaperSync
 {
@@ -10,81 +12,68 @@ namespace WallpaperSync
         private readonly HttpClient http;
         private readonly string cacheDir;
 
+        // apenas um download por FileId acontece de uma vez
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> fileLocks = new();
+
         public ImageDownloader(HttpClient httpClient, string cacheDirectory)
         {
             http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             cacheDir = cacheDirectory ?? throw new ArgumentNullException(nameof(cacheDirectory));
         }
 
-        public async Task<string> DownloadOriginalAsync(ImageEntry entry)
+        private SemaphoreSlim GetLock(string fileId)
+            => fileLocks.GetOrAdd(fileId, _ => new SemaphoreSlim(1, 1));
+
+
+        public async Task<string> DownloadOriginalAsync(ImageEntry entry, CancellationToken ct = default)
         {
-            var dir = Path.Combine(cacheDir, "originals");
+            string dir = Path.Combine(cacheDir, "originals");
             Directory.CreateDirectory(dir);
 
             string ext = Path.GetExtension(entry.FileServerName);
-            if (string.IsNullOrEmpty(ext)) ext = ".jpg";
+            if (string.IsNullOrWhiteSpace(ext))
+                ext = ".jpg";
 
             string target = Path.Combine(dir, $"{entry.FileId}{ext}");
-            if (File.Exists(target)) return target;
 
-            DebugLogger.Log($"ImageDownloader: Baixando original {entry.OriginalUrl}");
-            var resp = await http.GetAsync(new Uri(entry.OriginalUrl));
-            if (!resp.IsSuccessStatusCode) throw new Exception($"Falha ao baixar imagem original ({resp.StatusCode})");
-            var bytes = await resp.Content.ReadAsByteArrayAsync();
-            await File.WriteAllBytesAsync(target, bytes);
-            DebugLogger.Log($"ImageDownloader: salvo em {target}");
-            return target;
-        }
-        public async Task<string> DownloadThumbnailAsync(ImageEntry entry)
-        {
-            string thumbDir = Path.Combine(cacheDir, "thumbs");
-            Directory.CreateDirectory(thumbDir);
+            // já existe -> retorna
+            if (File.Exists(target))
+                return target;
 
-            string thumbPath = Path.Combine(thumbDir, $"{entry.FileId}_thumb.jpg");
-            string thumbUrl = entry.OriginalUrl + "?w=300";
-
-            DebugLogger.Log($"ImageDownloader: Baixando thumbnail {thumbUrl}");
-
-            HttpResponseMessage resp = await http.GetAsync(thumbUrl);
-            if (resp.IsSuccessStatusCode)
+            var sem = GetLock(entry.FileId);
+            await sem.WaitAsync(ct);
+            try
             {
-                byte[] bytes = await resp.Content.ReadAsByteArrayAsync();
-                await File.WriteAllBytesAsync(thumbPath, bytes);
-                DebugLogger.Log($"ImageDownloader: thumbnail salvo em {thumbPath}");
-                return thumbPath;
+                if (File.Exists(target))
+                    return target;
+
+                DebugLogger.Log($"ImageDownloader: Baixando original {entry.OriginalUrl}");
+
+                using var resp = await http.GetAsync(entry.OriginalUrl, ct);
+                resp.EnsureSuccessStatusCode();
+
+                var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
+                await File.WriteAllBytesAsync(target, bytes, ct);
+
+                DebugLogger.Log($"ImageDownloader: salvo em {target}");
+                return target;
             }
-            DebugLogger.Log("Servidor não suporta ?w=300 — usando fallback parcial");
-
-            var req = new HttpRequestMessage(HttpMethod.Get, entry.OriginalUrl);
-            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 150000); // baixa 150 KB
-
-            resp = await http.SendAsync(req);
-            if (!resp.IsSuccessStatusCode)
-                throw new Exception($"Falha ao baixar miniatura (HTTP {resp.StatusCode})");
-
-            byte[] partialBytes = await resp.Content.ReadAsByteArrayAsync();
-
-            // gera thumb a partir do pedaço baixado
-            using (var ms = new MemoryStream(partialBytes))
-            using (var original = Image.FromStream(ms, false, false))
-            using (var thumb = new Bitmap(original, new Size(300, 200)))
+            finally
             {
-                thumb.Save(thumbPath, System.Drawing.Imaging.ImageFormat.Jpeg);
+                sem.Release();
             }
-
-            DebugLogger.Log($"ImageDownloader: thumb gerada via fallback em {thumbPath}");
-            return thumbPath;
         }
 
-        public async Task<string> DownloadCustomAsync(string imageUrl)
+
+        public async Task<string> DownloadCustomAsync(string imageUrl, CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(imageUrl)) throw new ArgumentException("URL inválida.");
+            if (string.IsNullOrWhiteSpace(imageUrl))
+                throw new ArgumentException("URL inválida.");
 
-            var resp = await http.GetAsync(imageUrl);
-            if (!resp.IsSuccessStatusCode)
-                throw new Exception($"Falha ao baixar imagem (HTTP {resp.StatusCode}).");
+            using var resp = await http.GetAsync(imageUrl, ct);
+            resp.EnsureSuccessStatusCode();
 
-            byte[] bytes = await resp.Content.ReadAsByteArrayAsync();
+            byte[] bytes = await resp.Content.ReadAsByteArrayAsync(ct);
 
             string ext = Path.GetExtension(imageUrl).ToLowerInvariant();
             if (string.IsNullOrWhiteSpace(ext) || !IsValidImageExtension(ext))
@@ -102,31 +91,41 @@ namespace WallpaperSync
 
             string workspaceDir = Path.Combine(cacheDir, "custom");
             Directory.CreateDirectory(workspaceDir);
-            string fileName = $"custom_{DateTime.Now:yyyyMMdd_HHmmss}{ext}";
-            string finalPath = Path.Combine(workspaceDir, fileName);
 
-            await File.WriteAllBytesAsync(finalPath, bytes);
-            DebugLogger.Log($"ImageDownloader: custom salvo em {finalPath}");
-            return finalPath;
+            string fileName = $"custom_{DateTime.Now:yyyyMMdd_HHmmssfff}{ext}";
+            string path = Path.Combine(workspaceDir, fileName);
+
+            await File.WriteAllBytesAsync(path, bytes, ct);
+            DebugLogger.Log($"ImageDownloader: custom salvo em {path}");
+
+            return path;
         }
-        public async Task<byte[]?> DownloadRawBytesAsync(string url)
+
+
+        public async Task<byte[]?> DownloadRawBytesAsync(string url, CancellationToken ct = default)
         {
             try
             {
-                using var resp = await http.GetAsync(url);
+                using var resp = await http.GetAsync(url, ct);
                 if (!resp.IsSuccessStatusCode)
+                {
+                    DebugLogger.Log($"DownloadRawBytesAsync: falha HTTP {resp.StatusCode}");
                     return null;
-                return await resp.Content.ReadAsByteArrayAsync();
+                }
+
+                return await resp.Content.ReadAsByteArrayAsync(ct);
             }
-            catch
+            catch (Exception ex)
             {
+                DebugLogger.Log($"DownloadRawBytesAsync erro: {ex.Message}");
                 return null;
             }
         }
 
+
         private static bool IsValidImageExtension(string ext)
         {
-            return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp" || ext == ".webp";
+            return ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
         }
     }
 }
