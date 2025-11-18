@@ -65,6 +65,7 @@ Se você não concorda: **não execute** o programa.
 | Feature / Recurso                     | Script PowerShell | App GUI (EXE) |
 |---------------------------------------|:-----------------:|:-------------:|
 | Aplicar papel de parede               | ✔️                | ✔️            |
+| Restaurar papel de parede original    | ❌                | ✔️            |
 | Listagem de papeis de paredes         | ✔️                | ✔️            |
 | Imagens próprias                      | ⚠️ (apenas url)   | ✔️            |
 | Prévias                               | ❌                | ✔️            |
@@ -103,7 +104,7 @@ Se você não concorda: **não execute** o programa.
 **R:** As imagens são baixadas de forma temporária e removidas após realizar o processo.
 
 **P:** Posso desfazer a alteração?  
-**R:** Sim — tanto o script quanto a GUI possuem opções de restaurar o papel de parede original.
+**R:** Sim — a versão GUI possui uma opção de restaurar o papel de parede original.
 
 **P:** Posso utilizar uma imagem minha?  
 **R:** Sim — é possível fornecer uma imagem própria em ambas as versões.
