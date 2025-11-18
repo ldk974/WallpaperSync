@@ -77,7 +77,7 @@ Se você não concorda: **não execute** o programa.
 ## Downloads
 
 ### **GUI - Windows App**
-**[Download V1.1.0 (Gui)](http://github.com/ldk974/wallpapersync/releases/download/gui-v1.1.0/wallpapersync.exe)**
+**[Download V1.2.0 (Gui)](http://github.com/ldk974/wallpapersync/releases/download/gui-v1.2.0/wallpapersync.exe)**
 
 ### **Script PowerShell**
 **[Download V1.0.0 (PowerShell)](http://github.com/ldk974/wallpapersync/releases/download/ps-v1.0.0/wallpapersync.ps1)**
