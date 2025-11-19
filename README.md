@@ -72,7 +72,6 @@ Se você não concorda: **não execute** o programa.
 | Fallback automático (TranscodedWallpaper) | ✔️            | ✔️            |
 | Interface gráfica                     | ❌                | ✔️            |
 | Atualizações futuras                  | ❌ (somente patches) | ✔️         |
-| Categorias                            | ❌                | 🔜 (em breve) |
 
 ---
 ## Downloads
