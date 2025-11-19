@@ -15,11 +15,17 @@ namespace WallpaperSync
 {
     public partial class MainForm : Form
     {
-        private readonly List<ImageEntry> Images = new();
         private readonly string appdata = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WallpaperSyncGUI");
         private readonly string cacheDir;
         private readonly string backupDir;
         private readonly string transcodedPath;
+
+        private List<ImageEntry> Images = new List<ImageEntry>();
+        private List<ImageEntry> VisibleImages = new List<ImageEntry>();
+        private string currentCategory = "All";
+
+        private bool isHamburguerOpen = true;
+        private System.Windows.Forms.Timer slideTimer;
 
         private HttpClient http;
         private CatalogLoader catalogLoader;
@@ -27,11 +33,42 @@ namespace WallpaperSync
         private ThumbnailService thumbnailService;
         private GridRenderer gridRenderer;
         private UiService uiService;
-        private UndoManager undoManager;
 
         public MainForm()
         {
             InitializeComponent();
+
+            listCategories.SelectedIndexChanged += async (s, e) =>
+            {
+                if (listCategories.SelectedIndex < 0) return;
+                var cat = listCategories.SelectedItem?.ToString();
+                if (string.IsNullOrWhiteSpace(cat)) return;
+
+                currentCategory = cat;
+                await ApplyCategoryFilterAndRefreshAsync();
+                ToggleHamburguer();
+            };
+
+            slideTimer = new System.Windows.Forms.Timer { Interval = 15 };
+            slideTimer.Tick += (s, e) =>
+            {
+                int targetX = isHamburguerOpen ? 0 : -240;
+
+                int distance = targetX - panelHamburguer.Left;
+
+                int step = (int)(distance * 0.25);
+
+                if (Math.Abs(step) < 2)
+                    step = Math.Sign(step) * 2;
+
+                panelHamburguer.Left += step;
+
+                if (Math.Abs(panelHamburguer.Left - targetX) <= 1)
+                {
+                    panelHamburguer.Left = targetX;
+                    slideTimer.Stop();
+                }
+            };
 
             http = new HttpClient();
             http.DefaultRequestHeaders.UserAgent.ParseAdd(
@@ -58,7 +95,6 @@ namespace WallpaperSync
             thumbnailService = new ThumbnailService(imageDownloader, cacheDir, concurrency: 6);
             gridRenderer = new GridRenderer(flpGrid, thumbnailService, OnThumbnailClicked);
             uiService = new UiService(this, chkShowPreviews, btnRefresh, btnUndo, lblStatus);
-            undoManager = new UndoManager(backupDir);
 
             Load += MainForm_Load;
             FormClosing += MainForm_FormClosing;
@@ -95,6 +131,21 @@ namespace WallpaperSync
             var loaded = await catalogLoader.LoadCatalogAsync(urlTxt);
             Images.AddRange(loaded);
             DebugLogger.Log($"MainForm.LoadImages finalizado: {Images.Count} imagens.");
+
+            currentCategory = "All";
+            VisibleImages = Images.ToList();
+
+            // popula categorias no menu hamburguer
+            var cats = await ImageDownloader.GetCategoriesFromEntriesAsync(Images);
+            listCategories.Items.Clear();
+            foreach (var c in cats)
+                listCategories.Items.Add(c);
+
+            // seleciona "All" por padrão
+            if (listCategories.Items.Count > 0)
+                listCategories.SelectedIndex = 0;
+
+            await RefreshViewAsync();
         }
 
         private async Task OnThumbnailClicked(ImageEntry entry)
@@ -106,6 +157,7 @@ namespace WallpaperSync
             {
                 string path = await imageDownloader.DownloadOriginalAsync(entry);
                 using var preview = new PreviewForm(entry.Name, path);
+                uiService.SetStatus($"Mostrando preview: {entry.Name}");
                 var res = preview.ShowDialog(this);
                 if (res == DialogResult.OK)
                 {
@@ -188,13 +240,6 @@ namespace WallpaperSync
             await RefreshViewAsync();
         }
 
-        private void btnUndo_Click(object sender, EventArgs e)
-        {
-            DebugLogger.Log("Usuário clicou em UNDO.");
-            var restoreForm = new RestoreForm(undoManager, transcodedPath);
-            restoreForm.Show(this);
-        }
-
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             try
@@ -223,13 +268,13 @@ namespace WallpaperSync
 
             if (chkShowPreviews.Checked)
             {
-                DebugLogger.Log($"RefreshView: mostrando lista com {Images.Count} itens");
-                await gridRenderer.RenderAsync(Images, lblStatus);
+                DebugLogger.Log($"RefreshViewAsync: mostrando grid com {VisibleImages.Count} itens");
+                await gridRenderer.RenderAsync(VisibleImages, lblStatus);
             }
             else
             {
                 PopulateList();
-                DebugLogger.Log($"RefreshView: mostrando lista com {Images.Count} itens");
+                DebugLogger.Log($"RefreshViewAsync: mostrando lista com {VisibleImages.Count} itens");
             }
         }
 
@@ -237,13 +282,41 @@ namespace WallpaperSync
         {
             listWallpapers.BeginUpdate();
             listWallpapers.Items.Clear();
-            foreach (var img in Images)
+            foreach (var img in VisibleImages)
             {
                 listWallpapers.Items.Add(img);
             }
             listWallpapers.EndUpdate();
         }
+        private async Task ApplyCategoryFilterAndRefreshAsync()
+        {
+            if (currentCategory == "All" || string.IsNullOrWhiteSpace(currentCategory))
+            {
+                VisibleImages = Images.ToList();
+            }
+            else
+            {
+                VisibleImages = Images
+                    .Where(e => string.Equals(ImageDownloader.ExtractCategoryFromUrl(e.OriginalUrl), currentCategory, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            DebugLogger.Log($"CategoryFilter: '{currentCategory}' -> {VisibleImages.Count} imagens.");
+            await RefreshViewAsync();
+        }
+        private void ToggleHamburguer()
+        {
+            isHamburguerOpen = !isHamburguerOpen;
+            if (isHamburguerOpen)
+            {
+                panelHamburguer.Visible = true;
+            }
+            slideTimer.Start();
+        }
+
+
     }
+
     public static class ControlExtensions
     {
         public static void InvokeIfRequired(this Control c, Action a)

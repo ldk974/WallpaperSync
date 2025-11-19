@@ -18,6 +18,7 @@ namespace WallpaperSync
             btnUseFile = new Button();
             btnUseUrl = new Button();
             pictureBox1 = new PictureBox();
+            btnRestore = new Button();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
             // 
@@ -54,6 +55,17 @@ namespace WallpaperSync
             btnUseUrl.UseVisualStyleBackColor = true;
             btnUseUrl.Click += btnUseUrl_Click;
             // 
+            // btnRestore
+            // 
+            btnRestore.Location = new Point(43, 349);
+            btnRestore.Margin = new Padding(3, 2, 3, 2);
+            btnRestore.Name = "btnRestore";
+            btnRestore.Size = new Size(228, 38);
+            btnRestore.TabIndex = 6;
+            btnRestore.Text = "Restaurar";
+            btnRestore.UseVisualStyleBackColor = true;
+            btnRestore.Click += btnRestore_Click;
+            // 
             // pictureBox1
             // 
             pictureBox1.Image = (Image)resources.GetObject("pictureBox1.Image");
@@ -69,7 +81,8 @@ namespace WallpaperSync
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(30, 31, 34);
-            ClientSize = new Size(315, 358);
+            ClientSize = new Size(315, 409);
+            Controls.Add(btnRestore);
             Controls.Add(pictureBox1);
             Controls.Add(btnUseUrl);
             Controls.Add(btnUseFile);
@@ -84,5 +97,6 @@ namespace WallpaperSync
             ResumeLayout(false);
         }
         private PictureBox pictureBox1;
+        private Button btnRestore;
     }
 }

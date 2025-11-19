@@ -14,8 +14,9 @@ namespace WallpaperSync
         private readonly string backupDir;
         private readonly string transcodedPath;
 
-        private readonly HttpClient http;
+        private HttpClient http;
         private ImageDownloader imageDownloader;
+        private UndoManager undoManager;
 
         public StartupForm()
         {
@@ -37,6 +38,7 @@ namespace WallpaperSync
             );
 
             imageDownloader = new ImageDownloader(http, cacheDir);
+            undoManager = new UndoManager(backupDir);
 
             Load += StartupForm_Load;
             FormClosing += StartupForm_Closing;
@@ -87,7 +89,7 @@ namespace WallpaperSync
                 var workflow = new WallpaperWorkflow(imageTransformer, backupService, wallpaperApplier, transcodedPath);
 
                 bool applied = await workflow.ApplyAsync(ofd.FileName);
-                if (applied) DebugLogger.Log("MainForm: aplicado de arquivo com sucesso.");
+                if (applied) DebugLogger.Log("StartupForm: aplicado de arquivo com sucesso.");
             }
             catch (Exception ex)
             {
@@ -111,13 +113,19 @@ namespace WallpaperSync
                 var workflow = new WallpaperWorkflow(imageTransformer, backupService, wallpaperApplier, transcodedPath);
 
                 bool applied = await workflow.ApplyAsync(saved);
-                if (applied) DebugLogger.Log("MainForm: aplicado de URL com sucesso.");
+                if (applied) DebugLogger.Log("StartupForm: aplicado de URL com sucesso.");
             }
             catch (Exception ex)
             {
                 DebugLogger.Log($"ApplyFromUrl erro: {ex.Message}");
                 MessageBox.Show($"Erro ao aplicar: {ex.Message}");
             }
+        }
+        private void btnRestore_Click(object sender, EventArgs e)
+        {
+            DebugLogger.Log("Usuário clicou em RESTORE.");
+            var restoreForm = new RestoreForm(undoManager, transcodedPath);
+            restoreForm.Show(this);
         }
     }
 }

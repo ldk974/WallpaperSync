@@ -30,7 +30,7 @@ namespace WallpaperSync
         public void SetStatus(string text)
         {
             lblStatus.InvokeIfRequired(() => lblStatus.Text = text);
-            DebugLogger.Log($"UI: {text}");
+            DebugLogger.Log($"UiService: {text}");
         }
     }
 }

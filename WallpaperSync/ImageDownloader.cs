@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,8 +25,50 @@ namespace WallpaperSync
         private SemaphoreSlim GetLock(string fileId)
             => fileLocks.GetOrAdd(fileId, _ => new SemaphoreSlim(1, 1));
 
+    public static string ExtractCategoryFromUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return "unknown";
 
-        public async Task<string> DownloadOriginalAsync(ImageEntry entry, CancellationToken ct = default)
+        try
+        {
+            var uri = new Uri(url);
+            var segs = uri.Segments
+                .Select(s => s.Trim('/'))
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToArray();
+
+            if (segs.Length >= 2)
+                return segs[segs.Length - 2];
+
+            if (segs.Length == 1)
+                return "root";
+
+            return "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
+    public static Task<List<string>> GetCategoriesFromEntriesAsync(List<ImageEntry> entries)
+    {
+        if (entries == null) return Task.FromResult(new List<string> { "All" });
+
+        var cats = entries
+            .Select(e => ExtractCategoryFromUrl(e.OriginalUrl))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(s => s)
+            .ToList();
+
+        // adiciona uma categoria "All" no topo
+        cats.Insert(0, "All");
+        return Task.FromResult(cats);
+    }
+
+    public async Task<string> DownloadOriginalAsync(ImageEntry entry, CancellationToken ct = default)
         {
             string dir = Path.Combine(cacheDir, "originals");
             Directory.CreateDirectory(dir);

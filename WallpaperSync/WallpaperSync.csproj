@@ -3,9 +3,24 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+	
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+	
+	<SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+	
+	<AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <AssemblyInformationalVersion>1.2.0</AssemblyInformationalVersion>
+	<Deterministic>true</Deterministic>
+	<ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
+	<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+	
     <PackageIcon></PackageIcon>
     <Product>$(AssemblyName)</Product>
     <ApplicationIcon>logo.ico</ApplicationIcon>

@@ -11,8 +11,10 @@ namespace WallpaperSync
         private System.Windows.Forms.CheckBox chkShowPreviews;
         private System.Windows.Forms.Button btnRefresh;
         private System.Windows.Forms.Button btnUndo;
+        private System.Windows.Forms.Button btnHambuguer;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.ListBox listWallpapers;
+        private SmoothListBox listCategories;
 
 
         private void InitializeComponent()
@@ -22,11 +24,14 @@ namespace WallpaperSync
             chkShowPreviews = new CheckBox();
             btnRefresh = new Button();
             btnUndo = new Button();
+            btnHambuguer = new Button();
             lblStatus = new Label();
             panelBottom = new Panel();
             panelTop = new Panel();
             panelList = new Panel();
+            panelHamburguer = new Panel();
             listWallpapers = new ListBox();
+            listCategories = new SmoothListBox();
             panelBottom.SuspendLayout();
             panelTop.SuspendLayout();
             panelList.SuspendLayout();
@@ -58,25 +63,30 @@ namespace WallpaperSync
             // 
             // btnRefresh
             // 
+            btnRefresh.Image = Properties.Resources.refresh_icon;
+            btnRefresh.ImageAlign = ContentAlignment.MiddleCenter;
+            btnRefresh.FlatAppearance.BorderSize = 0;
+            btnRefresh.FlatStyle = FlatStyle.Flat;
             btnRefresh.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnRefresh.Location = new Point(674, 10);
             btnRefresh.Name = "btnRefresh";
-            btnRefresh.Size = new Size(96, 28);
+            btnRefresh.Size = new Size(32, 32);
+            //btnRefresh.Size = new Size(96, 28);
             btnRefresh.TabIndex = 2;
-            btnRefresh.Text = "Atualizar";
+            //btnRefresh.Text = "Atualizar";
             btnRefresh.UseVisualStyleBackColor = true;
             btnRefresh.Click += btnRefresh_Click;
-            // 
-            // btnUndo
-            // 
-            btnUndo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnUndo.Location = new Point(574, 10);
-            btnUndo.Name = "btnUndo";
-            btnUndo.Size = new Size(96, 28);
-            btnUndo.TabIndex = 3;
-            btnUndo.Text = "Restaurar";
-            btnUndo.UseVisualStyleBackColor = true;
-            btnUndo.Click += btnUndo_Click;
+            //
+            // btnHambuguer
+            //
+            btnHambuguer.Text = "☰";
+            btnHambuguer.Size = new Size(36, 32);
+            btnHambuguer.Left = 8;
+            btnHambuguer.Top = 6;
+            btnHambuguer.FlatStyle = FlatStyle.Flat;
+            btnHambuguer.FlatAppearance.BorderSize = 0;
+            btnHambuguer.UseVisualStyleBackColor = true;
+            btnHambuguer.Click += (s, e) => ToggleHamburguer();
             // 
             // lblStatus
             // 
@@ -100,7 +110,7 @@ namespace WallpaperSync
             // 
             // panelTop
             // 
-            panelTop.Controls.Add(btnUndo);
+            //panelTop.Controls.Add(btnHambuguer);
             panelTop.Controls.Add(btnRefresh);
             panelTop.Controls.Add(chkShowPreviews);
             panelTop.Dock = DockStyle.Top;
@@ -120,6 +130,16 @@ namespace WallpaperSync
             panelList.Padding = new Padding(12, 0, 12, 0);
             panelList.Size = new Size(784, 382);
             panelList.TabIndex = 1;
+            //
+            // panelHamburguer
+            //
+            panelHamburguer.Controls.Add(listCategories);
+            panelHamburguer.Width = 180;
+            panelHamburguer.Height = (ClientSize.Height*2);
+            panelHamburguer.Left = -180;
+            panelHamburguer.Top = panelTop.Bottom;
+            panelHamburguer.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
+            panelHamburguer.BackColor = Color.FromArgb(40, 40, 40);
             // 
             // listWallpapers
             // 
@@ -136,11 +156,19 @@ namespace WallpaperSync
             listWallpapers.TabIndex = 0;
             listWallpapers.Visible = false;
             listWallpapers.DoubleClick += listWallpapers_DoubleClick;
-            // 
+            //
+            // listCategories
+            //
+            listCategories.ItemHeight = 32;
+            listCategories.BorderStyle = BorderStyle.None;
+            listCategories.IntegralHeight= false;
+            listCategories.BackColor = Color.FromArgb(40, 40, 40);
+            listCategories.ForeColor = Color.White;
             // MainForm
             // 
             BackColor = Color.FromArgb(30, 31, 34);
             ClientSize = new Size(784, 462);
+            //Controls.Add(panelHamburguer);
             Controls.Add(panelList);
             Controls.Add(panelBottom);
             Controls.Add(panelTop);
@@ -154,6 +182,7 @@ namespace WallpaperSync
             panelList.ResumeLayout(false);
             ResumeLayout(false);
         }
+        private Panel panelHamburguer;
         private Panel panelBottom;
         private Panel panelTop;
         private Panel panelList;
