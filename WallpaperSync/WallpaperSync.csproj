@@ -23,12 +23,12 @@
 	
     <PackageIcon></PackageIcon>
     <Product>$(AssemblyName)</Product>
-    <ApplicationIcon>logo.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\logo.ico</ApplicationIcon>
     <AssemblyName>$(AssemblyName)</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="logo.ico" />
+    <Content Include="Resources\logo.ico" />
   </ItemGroup>
 
   <ItemGroup>
