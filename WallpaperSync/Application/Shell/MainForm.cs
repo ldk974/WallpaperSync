@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WallpaperSync.Application.Startup;
 using WallpaperSync.Domain.Models;
 using WallpaperSync.Domain.Workflows;
 using WallpaperSync.Infrastructure.Environment;
@@ -39,11 +40,24 @@ namespace WallpaperSync.Application.Shell
         private CancellationTokenSource? _viewCts;
         private bool _isPopulatingCategories;
 
+        private Form _startup;
+
+        private Image refreshIconDark;
+        private Image refreshIconLight;
+        private Image arrowDark;
+        private Image arrowLight;
+        private Image arrow_flipDark;
+        private Image arrow_flipLight;
+        private Image home_iconDark;
+        private Image home_iconLight;
+
         private const string CatalogUrl = "https://raw.githubusercontent.com/ldk974/WallpaperSync/refs/heads/master/current_urls.txt";
 
-        public MainForm()
+        public MainForm(Form startup)
         {
             InitializeComponent();
+
+            _startup = startup;
 
             _env = AppEnvironment.CreateDefault();
             _env.Ensure();
@@ -53,7 +67,7 @@ namespace WallpaperSync.Application.Shell
             _imageCache = new ImageCacheService(http, _env.CacheRoot);
             _thumbnailService = new ThumbnailService(_imageCache, _env.CacheRoot, concurrency: 6);
             _gridRenderer = new GridRenderer(flpGrid, _thumbnailService, HandleThumbnailClickAsync);
-            _ui = new UiService(this, chkShowPreviews, btnRefresh, btnUndo, lblStatus);
+            _ui = new UiService(this, chkShowPreviews, btnRefresh, btnUndo, lblStatus, pageStatus);
             _transformer = new WallpaperTransformer();
             _backupService = new BackupService(_env.BackupRoot);
             _applier = new WallpaperApplier(_env.TranscodedWallpaper);
@@ -62,13 +76,17 @@ namespace WallpaperSync.Application.Shell
             listWallpapers.DisplayMember = nameof(WallpaperItem.Name);
             chkShowPreviews.Checked = false;
 
-            listCategories.SelectedIndexChanged += OnCategoryChanged;
-            chkShowPreviews.CheckedChanged += OnPreviewToggleChanged;
-            listWallpapers.DoubleClick += OnListDoubleClick;
-            btnRefresh.Click += OnRefreshClicked;
-
             _slideTimer = new WinFormsTimer { Interval = 15 };
             _slideTimer.Tick += (_, __) => AnimateHamburger();
+
+            refreshIconDark = ThemeManager.RecolorImage(Properties.Resources.refresh_icon, Color.White);
+            refreshIconLight = ThemeManager.RecolorImage(Properties.Resources.refresh_icon, Color.Black);
+            arrowDark = ThemeManager.RecolorImage(Properties.Resources.arrow, Color.White);
+            arrowLight = ThemeManager.RecolorImage(Properties.Resources.arrow, Color.Black);
+            arrow_flipDark = ThemeManager.RecolorImage(Properties.Resources.arrow_flip, Color.White);
+            arrow_flipLight = ThemeManager.RecolorImage(Properties.Resources.arrow_flip, Color.Black);
+            home_iconDark = ThemeManager.RecolorImage(Properties.Resources.home_icon, Color.White);
+            home_iconLight = ThemeManager.RecolorImage(Properties.Resources.home_icon, Color.Black);
 
             Load += OnFormLoad;
             FormClosing += OnFormClosing;
@@ -97,6 +115,29 @@ namespace WallpaperSync.Application.Shell
 
         private async void OnRefreshClicked(object? sender, EventArgs e)
             => await RunSafelyAsync(ReloadCatalogAsync, "Atualizar catálogo");
+        private async void NextClick(object? sender, EventArgs e)
+        {
+            _viewCts?.Cancel();
+            _viewCts?.Dispose();
+            _viewCts = new CancellationTokenSource();
+            var token = _viewCts.Token;
+            await _gridRenderer.NextPageAsync(lblStatus, pageStatus, token);
+        }
+
+        private async void PrevClick(object? sender, EventArgs e)
+        {
+            _viewCts?.Cancel();
+            _viewCts?.Dispose();
+            _viewCts = new CancellationTokenSource();
+            var token = _viewCts.Token;
+            await _gridRenderer.PreviousPageAsync(lblStatus, pageStatus, token);
+        }
+
+        private async void HomeClick(object? sender, EventArgs e)
+        {
+            _startup.Show();
+            Close();
+        }
 
         private static async Task RunSafelyAsync(Func<Task> action, string context)
         {
@@ -112,7 +153,14 @@ namespace WallpaperSync.Application.Shell
 
         private async Task OnLoadAsync()
         {
+            bool dark = ThemeManager.IsDarkMode();
+
             ThemeManager.ApplyTheme(this);
+            btnRefresh.Image = dark ? refreshIconDark : refreshIconLight;
+            btnNext.Image = dark ? arrowDark : arrowLight;
+            btnPrev.Image = dark ? arrow_flipDark : arrow_flipLight;
+            btnHome.Image = dark ? home_iconDark : home_iconLight;
+
             await ReloadCatalogAsync();
         }
 
@@ -204,11 +252,12 @@ namespace WallpaperSync.Application.Shell
 
             if (chkShowPreviews.Checked)
             {
-                await _gridRenderer.RenderAsync(_visible, lblStatus, token);
+                await _gridRenderer.SetItemsAsync(_visible, lblStatus, pageStatus, token);
             }
             else
             {
                 PopulateListBox();
+                _ui.SetPage("");
             }
         }
 
@@ -221,7 +270,7 @@ namespace WallpaperSync.Application.Shell
                 listWallpapers.Items.Add(item);
             }
             listWallpapers.EndUpdate();
-            lblStatus.Text = $"Catálogo carregado ({_visible.Count} imagens)";
+            _ui.SetStatus($"Catálogo carregado ({_visible.Count} imagens)");
         }
 
         private async Task HandleThumbnailClickAsync(WallpaperItem item)
@@ -333,6 +382,7 @@ namespace WallpaperSync.Application.Shell
             _imageCache.Dispose();
             _transformer.Dispose();
             _env.CleanupCache();
+            _startup.Show();
         }
     }
 }

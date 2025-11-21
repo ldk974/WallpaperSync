@@ -19,63 +19,126 @@ namespace WallpaperSync.UI.Components
         private readonly ThumbnailService _thumbnails;
         private readonly Func<WallpaperItem, Task> _onClick;
 
+        private IReadOnlyList<WallpaperItem> _allItems = Array.Empty<WallpaperItem>();
+
+        public int PageSize { get; set; } = 12;
+        public int CurrentPage { get; private set; } = 1;
+        public int TotalPages => (_allItems.Count + PageSize - 1) / PageSize;
+
         public GridRenderer(
             FlowLayoutPanel panel,
             ThumbnailService thumbnails,
-            Func<WallpaperItem, Task> onClick)
+            Func<WallpaperItem, Task> onClick,
+            Label pageLabel = null)
         {
             _panel = panel ?? throw new ArgumentNullException(nameof(panel));
             _thumbnails = thumbnails ?? throw new ArgumentNullException(nameof(thumbnails));
             _onClick = onClick ?? throw new ArgumentNullException(nameof(onClick));
+
         }
 
-        public async Task RenderAsync(IReadOnlyList<WallpaperItem> items, Label statusLabel, CancellationToken token)
+        public async Task SetItemsAsync(
+            IReadOnlyList<WallpaperItem> items,
+            Label statusLabel, Label pageLabel,
+            CancellationToken token)
+        {
+            _allItems = items ?? Array.Empty<WallpaperItem>();
+            CurrentPage = 1;
+
+            await RenderPageAsync(statusLabel, pageLabel, token);
+        }
+
+        public async Task RenderPageAsync(Label statusLabel, Label pageLabel, CancellationToken token)
+        {
+            if (_allItems.Count == 0)
+                return;
+
+            if (CurrentPage < 1) CurrentPage = 1;
+            if (CurrentPage > TotalPages) CurrentPage = TotalPages;
+
+            var pageItems = _allItems
+                .Skip((CurrentPage - 1) * PageSize)
+                .Take(PageSize)
+                .ToList();
+
+            await RenderAsync(pageItems, statusLabel, pageLabel, token);
+        }
+
+        public async Task NextPageAsync(Label statusLabel, Label pageLabel, CancellationToken token)
+        {
+            if (CurrentPage < TotalPages)
+            {
+                CurrentPage++;
+                await RenderPageAsync(statusLabel, pageLabel, token);
+            }
+        }
+
+        public async Task PreviousPageAsync(Label statusLabel, Label pageLabel, CancellationToken token)
+        {
+            if (CurrentPage > 1)
+            {
+                CurrentPage--;
+                await RenderPageAsync(statusLabel, pageLabel, token);
+            }
+        }
+
+        public async Task RenderAsync(IReadOnlyList<WallpaperItem> items, Label statusLabel, Label pageLabel, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
 
-            statusLabel.InvokeIfRequired(() => statusLabel.Text = "Carregando thumbnails...");
+            statusLabel.InvokeIfRequired(() =>
+                statusLabel.Text = "Carregando thumbnails...");
 
+            // remove tudo sem flicker
             _panel.InvokeIfRequired(() =>
             {
+                _panel.SuspendLayout();
+                _panel.Visible = false;
+
                 foreach (Control c in _panel.Controls)
                 {
-                    if (c is Panel panel)
+                    if (c is Panel p)
                     {
-                        foreach (var pic in panel.Controls.OfType<PictureBox>())
-                        {
+                        foreach (var pic in p.Controls.OfType<PictureBox>())
                             pic.Image?.Dispose();
-                        }
                     }
-
                     c.Dispose();
                 }
 
                 _panel.Controls.Clear();
-                _panel.SuspendLayout();
+                _panel.ResumeLayout();
             });
 
+            // placeholders fixos
             var placeholders = items.Select(CreatePlaceholder).ToArray();
+
             _panel.InvokeIfRequired(() =>
             {
+                _panel.SuspendLayout();
                 _panel.Controls.AddRange(placeholders);
                 _panel.ResumeLayout();
+                _panel.Visible = true;
             });
 
             int completed = 0;
             int total = items.Count;
 
-            var loadTasks = items.Select((item, index) => LoadThumbnailAsync(item, placeholders[index], () =>
-            {
-                Interlocked.Increment(ref completed);
-                statusLabel.InvokeIfRequired(() =>
-                    statusLabel.Text = $"Carregando thumbnails... {completed}/{total}");
-            }, token));
+            var loadTasks = items.Select((item, index) =>
+                LoadThumbnailAsync(item, placeholders[index], () =>
+                {
+                    Interlocked.Increment(ref completed);
+                    statusLabel.InvokeIfRequired(() =>
+                        statusLabel.Text = $"Carregando thumbnails... {completed}/{total}");
+                }, token)
+            );
 
             try
             {
                 await Task.WhenAll(loadTasks);
+
                 statusLabel.InvokeIfRequired(() =>
                     statusLabel.Text = $"Catálogo carregado ({items.Count} imagens)");
+                    pageLabel.Text = $"Página {CurrentPage} de {TotalPages}";
             }
             catch (OperationCanceledException)
             {
@@ -94,44 +157,29 @@ namespace WallpaperSync.UI.Components
                 var clone = new Bitmap(image);
                 var applied = false;
 
-                try
+                placeholder.InvokeIfRequired(() =>
                 {
-                    placeholder.InvokeIfRequired(() =>
+                    if (placeholder.IsDisposed) return;
+
+                    _panel.SuspendLayout();
+
+                    if (placeholder.Controls.OfType<PictureBox>().FirstOrDefault() is PictureBox pb)
                     {
-                        if (placeholder.IsDisposed)
-                            return;
+                        pb.Image?.Dispose();
+                        pb.Image = clone;
+                        applied = true;
+                    }
 
-                        if (placeholder.Controls.OfType<PictureBox>().FirstOrDefault() is PictureBox pb)
-                        {
-                            pb.Image?.Dispose();
-                            pb.Image = clone;
-                            applied = true;
-                        }
+                    if (placeholder.Controls.OfType<Label>().FirstOrDefault() is Label lbl)
+                        lbl.Text = item.Name;
 
-                        if (placeholder.Controls.OfType<Label>().FirstOrDefault() is Label lbl)
-                        {
-                            lbl.Text = item.Name;
-                        }
-                    });
-                }
-                catch (ObjectDisposedException)
-                {
-                }
+                    _panel.ResumeLayout(false);
+                });
 
                 if (!applied)
-                {
                     clone.Dispose();
-                }
             }
-            catch (OperationCanceledException ex) when (!token.IsCancellationRequested)
-            {
-                CoreLogger.Log($"Thumbnail não disponível ainda: {item.Name} ({ex.Message})");
-                return;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 CoreLogger.Log($"GridRenderer thumbnail falhou: {ex.Message}");
@@ -147,19 +195,18 @@ namespace WallpaperSync.UI.Components
             var panel = new Panel
             {
                 Width = 160,
-                Height = 140,
-                Margin = new Padding(8),
-                BackColor = Color.FromArgb(32, 34, 38),
+                Height = 118,
+                Margin = new Padding(5),
                 Tag = item
             };
 
             var picture = new PictureBox
             {
                 Width = 150,
-                Height = 90,
+                Height = 85,
                 Left = 5,
                 Top = 5,
-                SizeMode = PictureBoxSizeMode.Zoom,
+                SizeMode = PictureBoxSizeMode.StretchImage,
                 BackColor = Color.FromArgb(25, 27, 30),
                 Cursor = Cursors.Hand
             };
@@ -172,20 +219,18 @@ namespace WallpaperSync.UI.Components
                 Height = 40,
                 AutoEllipsis = true,
                 Text = item.Name,
-                ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9f)
-            };
+            };;
 
             picture.Click += async (_, __) => await _onClick(item);
             label.Click += async (_, __) => await _onClick(item);
+
 
             panel.Controls.Add(picture);
             panel.Controls.Add(label);
             return panel;
         }
 
-        public void Dispose()
-        {
-        }
+        public void Dispose() { }
     }
 }

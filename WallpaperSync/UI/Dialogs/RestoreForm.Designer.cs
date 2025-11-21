@@ -131,7 +131,7 @@ namespace WallpaperSync.UI.Dialogs
             btnPanel.WrapContents = false;
             btnPanel.AutoSize = true;
             btnPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            btnPanel.Dock = DockStyle.None; // importante
+            btnPanel.Dock = DockStyle.None;
             btnPanel.Controls.Add(btnOpenFolder);
             btnPanel.Controls.Add(btnRestore);
             btnPanel.Controls.Add(btnRestoreLast);
@@ -176,6 +176,7 @@ namespace WallpaperSync.UI.Dialogs
             Controls.Add(rightPanel);
             Controls.Add(lv);
             MinimumSize = new Size(1180, 490);
+            Icon = Properties.Resources.logo;
             Name = "RestoreForm";
             StartPosition = FormStartPosition.CenterParent;
             Text = "WallpaperSync";

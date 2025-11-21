@@ -74,6 +74,7 @@
             Controls.Add(btnApplyLater);
             Controls.Add(btnApplyNow);
             Controls.Add(pbPreview);
+            Icon = Properties.Resources.logo;
             Font = new Font("Segoe UI", 9F);
             Name = "PreviewForm";
             Text = "Preview";

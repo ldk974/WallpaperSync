@@ -58,8 +58,7 @@ namespace WallpaperSync.Application.Startup
 
         private void btnUseDefault_Click(object sender, EventArgs e)
         {
-            var main = new MainForm();
-            main.FormClosed += (_, __) => Close();
+            var main = new MainForm(this);
             Hide();
             main.Show();
         }

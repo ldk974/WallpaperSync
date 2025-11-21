@@ -90,6 +90,7 @@ namespace WallpaperSync.Application.Startup
             FormBorderStyle = FormBorderStyle.FixedDialog;
             Margin = new Padding(3, 2, 3, 2);
             MaximizeBox = false;
+            Icon = Properties.Resources.logo;
             Name = "StartupForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "WallpaperSync";

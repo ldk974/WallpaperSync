@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Windows.Forms;
 
 namespace WallpaperSync.UI.Components
@@ -36,6 +37,7 @@ namespace WallpaperSync.UI.Components
 
             form.BackColor = dark ? Color.FromArgb(28, 32, 40) : Color.FromArgb(239, 244, 249);
             SetControlsBackColor(form.Controls, dark);
+
         }
 
         private static void SetControlsBackColor(Control.ControlCollection controls, bool dark)
@@ -70,5 +72,34 @@ namespace WallpaperSync.UI.Components
                     SetControlsBackColor(ctrl.Controls, dark);
             }
         }
+        public static Image RecolorImage(Image original, Color color)
+        {
+            Bitmap bmp = new Bitmap(original.Width, original.Height);
+
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                var attributes = new ImageAttributes();
+
+                var matrix = new ColorMatrix(new float[][]
+                {
+            new float[] {0, 0, 0, 0, 0},
+            new float[] {0, 0, 0, 0, 0},
+            new float[] {0, 0, 0, 0, 0},
+            new float[] {0, 0, 0, 1, 0},
+            new float[] {color.R/255f, color.G/255f, color.B/255f, 0, 1}
+                });
+
+                attributes.SetColorMatrix(matrix);
+
+                g.DrawImage(original,
+                    new Rectangle(0, 0, original.Width, original.Height),
+                    0, 0, original.Width, original.Height,
+                    GraphicsUnit.Pixel,
+                    attributes);
+            }
+
+            return bmp;
+        }
+
     }
 }
