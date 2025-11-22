@@ -336,14 +336,19 @@ namespace WallpaperSync.Application.Shell
             }
         }
 
-        private Task ApplyLaterAsync(string path)
+        private async Task ApplyLaterAsync(string path)
         {
-            return Task.Run(() =>
+            _backupService.CreateBackupIfExists(_env.TranscodedWallpaper);
+            var applied = _applier.ApplyViaTranscodedWallpaper(path);
+            if (!applied)
             {
-                CoreLogger.Log("MainForm: fallback para ApplyViaTranscodedWallpaper (aplicar depois).");
-                _backupService.CreateBackupIfExists(_env.TranscodedWallpaper);
-                _applier.ApplyViaTranscodedWallpaper(path);
-            });
+                CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.");
+                Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+            }
+            else
+            {
+                CoreLogger.Log("MainForm: wallpaper copiado com sucesso.");
+            }
         }
 
         private void ToggleHamburger()

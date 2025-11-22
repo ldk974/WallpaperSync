@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using WallpaperSync.Application.Shell;
@@ -10,6 +11,7 @@ using WallpaperSync.Infrastructure.Services;
 using WallpaperSync.Infrastructure.SystemIntegration;
 using WallpaperSync.UI.Components;
 using WallpaperSync.UI.Dialogs;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace WallpaperSync.Application.Startup
 {
@@ -18,6 +20,8 @@ namespace WallpaperSync.Application.Startup
         private readonly AppEnvironment _env;
         private readonly ImageCacheService _cache;
         private readonly UndoManager _undoManager;
+        private readonly BackupService _backupService;
+        private readonly WallpaperApplier _applier;
         private readonly WallpaperWorkflow _workflow;
 
         public StartupForm()
@@ -30,6 +34,8 @@ namespace WallpaperSync.Application.Startup
             var http = HttpClientProvider.Shared;
             _cache = new ImageCacheService(http, _env.CacheRoot);
             _undoManager = new UndoManager(_env.BackupRoot);
+            _backupService = new BackupService(_env.BackupRoot);
+            _applier = new WallpaperApplier(_env.TranscodedWallpaper);
             _workflow = new WallpaperWorkflow(
                 new WallpaperTransformer(),
                 new BackupService(_env.BackupRoot),
@@ -74,7 +80,48 @@ namespace WallpaperSync.Application.Startup
             if (ofd.ShowDialog() != DialogResult.OK)
                 return;
 
-            await ApplyWorkflowAsync(ofd.FileName);
+            string path = ofd.FileName;
+
+            TaskDialogButton nowButton = new ("Aplicar agora");
+            TaskDialogButton laterButton = new ("Aplicar ao reiniciar");
+
+            var dialog = new TaskDialogPage
+            {
+                Caption = "Escolher ação",
+                Heading = "O que você deseja fazer com a imagem selecionada?",
+                Buttons = new TaskDialogButtonCollection() { nowButton, laterButton },
+                Text = "Selecione uma das opções abaixo."
+            };
+
+            var result = TaskDialog.ShowDialog(dialog);
+
+            if (result == nowButton)
+            {
+                var applied = await _workflow.ApplyAsync(path).ConfigureAwait(false);
+                if (!applied)
+                {
+                    CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.");
+                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                }
+                else
+                {
+                    CoreLogger.Log("MainForm: wallpaper aplicado com sucesso.");
+                }
+            }
+            else if (result == laterButton)
+            {
+                _backupService.CreateBackupIfExists(_env.TranscodedWallpaper);
+                var applied = _applier.ApplyViaTranscodedWallpaper(path);
+                if (!applied)
+                {
+                    CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.");
+                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                }
+                else
+                {
+                    CoreLogger.Log("MainForm: wallpaper copiado com sucesso.");
+                }
+            }
         }
 
         private async void btnUseUrl_Click(object sender, EventArgs e)
@@ -87,14 +134,47 @@ namespace WallpaperSync.Application.Startup
             if (string.IsNullOrWhiteSpace(url))
                 return;
 
-            try
+            var saved = await _cache.SaveCustomAsync(url);
+
+            TaskDialogButton nowButton = new("Aplicar agora");
+            TaskDialogButton laterButton = new("Aplicar ao reiniciar");
+
+            var dialog = new TaskDialogPage
             {
-                var saved = await _cache.SaveCustomAsync(url);
-                await ApplyWorkflowAsync(saved);
+                Caption = "Escolher ação",
+                Heading = "O que você deseja fazer com a imagem selecionada?",
+                Buttons = new TaskDialogButtonCollection() { nowButton, laterButton },
+                Text = "Selecione uma das opções abaixo."
+            };
+
+            var result = TaskDialog.ShowDialog(dialog);
+
+            if (result == nowButton)
+            {
+                var applied = await _workflow.ApplyAsync(saved).ConfigureAwait(false);
+                if (!applied)
+                {
+                    CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.");
+                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                }
+                else
+                {
+                    CoreLogger.Log("MainForm: wallpaper aplicado com sucesso.");
+                }
             }
-            catch (Exception ex)
+            else if (result == laterButton)
             {
-                MessageBox.Show($"Falha ao baixar URL: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _backupService.CreateBackupIfExists(_env.TranscodedWallpaper);
+                var applied = _applier.ApplyViaTranscodedWallpaper(saved);
+                if (!applied)
+                {
+                    CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.");
+                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                }
+                else
+                {
+                    CoreLogger.Log("MainForm: wallpaper copiado com sucesso.");
+                }
             }
         }
 
@@ -102,20 +182,6 @@ namespace WallpaperSync.Application.Startup
         {
             var restore = new RestoreForm(_undoManager, _env.TranscodedWallpaper);
             restore.Show(this);
-        }
-
-        private async Task ApplyWorkflowAsync(string path)
-        {
-            try
-            {
-                bool applied = await _workflow.ApplyAsync(path);
-                if (!applied)
-                    MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Erro ao aplicar wallpaper: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
         }
     }
 }
