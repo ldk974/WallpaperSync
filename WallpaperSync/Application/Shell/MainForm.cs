@@ -51,8 +51,6 @@ namespace WallpaperSync.Application.Shell
         private Image home_iconDark;
         private Image home_iconLight;
 
-        private const string CatalogUrl = "https://raw.githubusercontent.com/ldk974/WallpaperSync/refs/heads/master/current_urls.txt";
-
         public MainForm(Form startup)
         {
             InitializeComponent();
@@ -174,7 +172,7 @@ namespace WallpaperSync.Application.Shell
 
             try
             {
-                _catalog = await _catalogService.LoadAsync(CatalogUrl);
+                _catalog = await _catalogService.LoadAsync();
                 _visible = _catalog;
                 PopulateCategories();
                 loaded = true;

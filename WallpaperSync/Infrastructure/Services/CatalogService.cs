@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WallpaperSync.Domain.Models;
 using WallpaperSync.Infrastructure.Logging;
+using static System.Net.WebRequestMethods;
 
 namespace WallpaperSync.Infrastructure.Services
 {
@@ -23,25 +24,13 @@ namespace WallpaperSync.Infrastructure.Services
             _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         }
 
-        public async Task<IReadOnlyList<WallpaperItem>> LoadAsync(string currentUrlsTxt, CancellationToken cancellationToken = default)
+        public async Task<IReadOnlyList<WallpaperItem>> LoadAsync(CancellationToken cancellationToken = default)
         {
             CoreLogger.Log("CatalogService.LoadAsync iniciado");
 
             var catalog = new List<WallpaperItem>();
-            var raw = await TryGetString(currentUrlsTxt, cancellationToken);
-            if (string.IsNullOrWhiteSpace(raw))
-                return catalog;
 
-            var baseUrl = raw
-                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .FirstOrDefault()
-                ?.Trim();
-
-            if (string.IsNullOrWhiteSpace(baseUrl))
-                return catalog;
-
-            if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
-                baseUrl += "/";
+            var baseUrl = "https://ldk-ws.xyz/";
 
             foreach (var folder in _folders)
             {
