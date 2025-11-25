@@ -25,28 +25,51 @@ namespace WallpaperSync.Domain.Workflows
             _backup = backup ?? throw new ArgumentNullException(nameof(backup));
             _applier = applier ?? throw new ArgumentNullException(nameof(applier));
             _transcodedPath = transcodedPath ?? throw new ArgumentNullException(nameof(transcodedPath));
+
+            CoreLogger.Log("WallpaperWorkflow inicializado.", LogLevel.Debug);
         }
 
         public async Task<bool> ApplyAsync(string path, CancellationToken token = default)
         {
+            CoreLogger.Log($"Iniciando ApplyAsync para '{path}'.", LogLevel.Info);
+
             string? prepared = null;
             try
             {
                 prepared = await Task.Run(() => PrepareImage(path), token).ConfigureAwait(false);
+                CoreLogger.Log($"Imagem preparada em '{prepared}'.", LogLevel.Debug);
+
                 await BackupExistingAsync();
 
                 var copyOk = await CopyWithRetryAsync(prepared, _transcodedPath, token).ConfigureAwait(false);
-                if (!copyOk) return false;
+                if (!copyOk)
+                {
+                    CoreLogger.Log("Falha ao copiar imagem para TranscodedWallpaper após múltiplas tentativas.", LogLevel.Error);
+                    return false;
+                }
+
+                CoreLogger.Log("Arquivo copiado para TranscodedWallpaper com sucesso.", LogLevel.Info);
 
                 if (_applier.ApplyViaApi(_transcodedPath))
+                {
+                    CoreLogger.Log("Wallpaper aplicado via API com sucesso.", LogLevel.Info);
                     return true;
+                }
 
-                CoreLogger.Log("WallpaperWorkflow fallback para TranscodedWallpaper.");
-                return _applier.ApplyViaTranscodedWallpaper(prepared);
+                CoreLogger.Log("Falha ao aplicar via API — tentando fallback para TranscodedWallpaper.", LogLevel.Warning);
+
+                bool fallbackOk = _applier.ApplyViaTranscodedWallpaper(prepared);
+                CoreLogger.Log(
+                    fallbackOk
+                        ? "Wallpaper aplicado via TranscodedWallpaper com sucesso."
+                        : "Falha ao aplicar",
+                    fallbackOk ? LogLevel.Info : LogLevel.Error);
+
+                return fallbackOk;
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"WallpaperWorkflow.ApplyAsync falhou: {ex}");
+                CoreLogger.Log($"WallpaperWorkflow.ApplyAsync falhou: {ex}", LogLevel.Error);
                 return false;
             }
             finally
@@ -60,6 +83,8 @@ namespace WallpaperSync.Domain.Workflows
 
         private string PrepareImage(string path)
         {
+            CoreLogger.Log($"Preparando imagem '{path}'.", LogLevel.Debug);
+
             using var original = _transformer.LoadUnlocked(path);
             using var cropped = _transformer.EnsureAspect(original);
             using var resized = _transformer.ResizeIfNeeded(cropped);
@@ -102,11 +127,12 @@ namespace WallpaperSync.Domain.Workflows
                 if (File.Exists(path))
                 {
                     File.Delete(path);
+                    CoreLogger.Log($"Arquivo temporário removido: '{path}'.", LogLevel.Debug);
                 }
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"WallpaperWorkflow não conseguiu remover temp '{path}': {ex.Message}");
+                CoreLogger.Log($"Falha ao remover arquivo temporário '{path}': {ex.Message}", LogLevel.Warning);
             }
         }
     }

@@ -24,7 +24,7 @@ namespace WallpaperSync.Infrastructure.Services
         private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _inflight =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public ThumbnailService(ImageCacheService cache, string cacheRoot, int concurrency = 6)
+        public ThumbnailService(ImageCacheService cache, string cacheRoot, int concurrency = 4)
         {
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _thumbRoot = Path.Combine(cacheRoot ?? throw new ArgumentNullException(nameof(cacheRoot)), "thumbs");
@@ -67,7 +67,7 @@ namespace WallpaperSync.Infrastructure.Services
                 swWait.Stop();
                 acquired = true;
 
-                CoreLogger.Log($"WAIT TIME: {swWait.ElapsedMilliseconds} ms");
+                //CoreLogger.Log($"WAIT TIME: {swWait.ElapsedMilliseconds} ms");
 
                 // timer total de download + save
                 var swTotal = Stopwatch.StartNew();
@@ -94,7 +94,7 @@ namespace WallpaperSync.Infrastructure.Services
                             await File.WriteAllBytesAsync(destination, bytes, token).ConfigureAwait(false);
                             _ioLimiter.Release();
 
-                            CoreLogger.Log($"ThumbnailService: salvo thumbnail remota {destination} " + $"(download: {swDownload.ElapsedMilliseconds} ms, total: {swTotal.ElapsedMilliseconds} ms)");
+                            //CoreLogger.Log($"ThumbnailService: salvo thumbnail remota {destination} " + $"(download: {swDownload.ElapsedMilliseconds} ms, total: {swTotal.ElapsedMilliseconds} ms)");
 
                             return destination;
                         }

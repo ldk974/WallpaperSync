@@ -44,6 +44,7 @@ namespace WallpaperSync.Infrastructure.Services
             try
             {
                 File.Copy(backupPath, destination, overwrite: true);
+                CoreLogger.Log($"UndoManager: backup restaurado de {backupPath} para {destination}");
                 return true;
             }
             catch (Exception ex)
@@ -60,11 +61,13 @@ namespace WallpaperSync.Infrastructure.Services
             {
                 if (File.Exists(path))
                     File.Delete(path);
+                CoreLogger.Log($"UndoManager: backup deletado com sucesso: {path}");
                 return true;
             }
             catch (Exception ex)
             {
                 error = ex.Message;
+                CoreLogger.Log($"UndoManager.Delete falhou: {ex}");
                 return false;
             }
         }

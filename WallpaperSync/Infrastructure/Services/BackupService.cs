@@ -19,16 +19,17 @@ namespace WallpaperSync.Infrastructure.Services
             if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
                 return null;
 
-            var file = $"TranscodedWallpaper_{DateTime.Now:yyyyMMdd_HHmmssfff}_{Guid.NewGuid():N}.bak";
+            var file = $"TranscodedWallpaper_{DateTime.Now:ddMMyyyy_HHmmssfff}_{Guid.NewGuid():N}.bak";
             var destination = Path.Combine(_directory, file);
             try
             {
                 File.Copy(sourcePath, destination, overwrite: false);
+                CoreLogger.Log($"BackupService criou backup em: {destination}");
                 return destination;
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"BackupService.CreateBackup falhou: {ex.Message}");
+                CoreLogger.Log($"BackupService falhou: {ex.Message}");
                 return null;
             }
         }

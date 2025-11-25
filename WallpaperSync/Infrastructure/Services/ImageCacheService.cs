@@ -23,8 +23,12 @@ namespace WallpaperSync.Infrastructure.Services
             _http = http ?? throw new ArgumentNullException(nameof(http));
             _cacheRoot = cacheRoot ?? throw new ArgumentNullException(nameof(cacheRoot));
 
+            CoreLogger.Log("Inicializando ImageCacheService...", LogLevel.Debug);
+
             Directory.CreateDirectory(OriginalsDir);
             Directory.CreateDirectory(CustomDir);
+
+            CoreLogger.Log("Diretórios de cache criados/verificados.", LogLevel.Debug);
         }
 
         private string OriginalsDir => Path.Combine(_cacheRoot, "originals");
@@ -32,22 +36,32 @@ namespace WallpaperSync.Infrastructure.Services
 
         public async Task<string> EnsureOriginalAsync(WallpaperItem item, CancellationToken token = default)
         {
+            CoreLogger.Log($"EnsureOriginalAsync iniciado para ID={item.Id}", LogLevel.Info);
+
             var extension = Path.GetExtension(item.FileName);
             if (string.IsNullOrWhiteSpace(extension))
                 extension = ".jpg";
 
             var destination = Path.Combine(OriginalsDir, $"{item.Id}{extension}");
             if (File.Exists(destination))
+            {
+                CoreLogger.Log($"Arquivo já está em cache: {destination}", LogLevel.Debug);
                 return destination;
+            }
 
             var gate = Rent(item.Id);
             await gate.WaitAsync(token).ConfigureAwait(false);
+
             try
             {
                 if (File.Exists(destination))
+                {
+                    CoreLogger.Log($"Arquivo encontrado em cache após lock: {destination}", LogLevel.Debug);
                     return destination;
+                }
 
-                CoreLogger.Log($"ImageCacheService baixando {item.OriginalUrl}");
+                CoreLogger.Log($"Baixando imagem original: {item.OriginalUrl}", LogLevel.Info);
+
                 var bytes = await SendWithRetryAsync(
                     async ct =>
                     {
@@ -58,6 +72,7 @@ namespace WallpaperSync.Infrastructure.Services
                     $"EnsureOriginal {item.Id}",
                     token).ConfigureAwait(false);
 
+                CoreLogger.Log($"Salvando imagem baixada em {destination}", LogLevel.Debug);
                 await File.WriteAllBytesAsync(destination, bytes, token).ConfigureAwait(false);
                 return destination;
             }
@@ -70,6 +85,8 @@ namespace WallpaperSync.Infrastructure.Services
 
         public async Task<string> SaveCustomAsync(string imageUrl, CancellationToken token = default)
         {
+            CoreLogger.Log($"SaveCustomAsync solicitado para URL: {imageUrl}", LogLevel.Info);
+
             if (string.IsNullOrWhiteSpace(imageUrl))
                 throw new ArgumentException("URL inválida", nameof(imageUrl));
 
@@ -93,28 +110,33 @@ namespace WallpaperSync.Infrastructure.Services
 
         public async Task<byte[]?> DownloadBytesAsync(string url, CancellationToken token = default)
         {
+            CoreLogger.Log($"DownloadBytesAsync iniciado para: {url}", LogLevel.Debug);
+
             try
             {
                 using var resp = await _http.GetAsync(url, token);
                 if (!resp.IsSuccessStatusCode)
                 {
+                    CoreLogger.Log($"Erro HTTP {resp.StatusCode} ao baixar: {url}", LogLevel.Warning);
                     throw new HttpRequestException($"Status {resp.StatusCode}");
                 }
 
+                CoreLogger.Log($"Download concluído para {url}", LogLevel.Debug);
                 return await resp.Content.ReadAsByteArrayAsync(token);
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
-                CoreLogger.Log($"ImageCacheService.DownloadBytes cancelado após múltiplas tentativas: {url}");
+                CoreLogger.Log($"ImageCacheService.DownloadBytes cancelado após múltiplas tentativas: {url}", LogLevel.Warning);
                 return null;
             }
             catch (OperationCanceledException)
             {
+                CoreLogger.Log($"Download cancelado pelo token: {url}", LogLevel.Debug);
                 throw;
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"ImageCacheService.DownloadBytes falhou: {ex.Message}");
+                CoreLogger.Log($"ImageCacheService.DownloadBytes falhou: {ex.Message}", LogLevel.Warning);
                 return null;
             }
         }
@@ -123,7 +145,12 @@ namespace WallpaperSync.Infrastructure.Services
         {
             var ext = Path.GetExtension(url)?.ToLowerInvariant();
             if (!string.IsNullOrWhiteSpace(ext) && IsValidImageExtension(ext))
+            {
+                CoreLogger.Log($"Extensão inferida da URL: {ext}", LogLevel.Debug);
                 return ext;
+            }
+
+            CoreLogger.Log($"Inferindo extensão a partir do content-type: {contentType}", LogLevel.Debug);
 
             return contentType switch
             {
@@ -143,6 +170,8 @@ namespace WallpaperSync.Infrastructure.Services
             string context,
             CancellationToken token)
         {
+            CoreLogger.Log($"{context}: iniciando operação com retry.", LogLevel.Debug);
+
             for (int attempt = 1; attempt <= MaxHttpRetries; attempt++)
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -153,8 +182,13 @@ namespace WallpaperSync.Infrastructure.Services
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested)
                 {
+                    CoreLogger.Log($"{context}: tentativa {attempt} expirou por timeout.", LogLevel.Warning);
+
                     if (attempt == MaxHttpRetries)
+                    {
+                        CoreLogger.Log($"{context}: esgotou todas as tentativas.", LogLevel.Error);
                         throw;
+                    }
 
                     CoreLogger.Log($"{context}: tentativa {attempt} cancelada (timeout). Retentando...");
                     await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), token).ConfigureAwait(false);
@@ -177,11 +211,15 @@ namespace WallpaperSync.Infrastructure.Services
 
         public void Dispose()
         {
+            CoreLogger.Log("Liberando ImageCacheService e descartando locks...", LogLevel.Info);
+
             foreach (KeyValuePair<string, SemaphoreSlim> entry in _locks)
             {
                 entry.Value.Dispose();
             }
             _locks.Clear();
+
+            CoreLogger.Log("ImageCacheService finalizado.", LogLevel.Debug);
         }
     }
 }

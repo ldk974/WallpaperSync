@@ -63,7 +63,7 @@ namespace WallpaperSync.Application.Shell
             var http = HttpClientProvider.Shared;
             _catalogService = new CatalogService(http);
             _imageCache = new ImageCacheService(http, _env.CacheRoot);
-            _thumbnailService = new ThumbnailService(_imageCache, _env.CacheRoot, concurrency: 6);
+            _thumbnailService = new ThumbnailService(_imageCache, _env.CacheRoot, concurrency: 4);
             _gridRenderer = new GridRenderer(flpGrid, _thumbnailService, HandleThumbnailClickAsync);
             _ui = new UiService(this, chkShowPreviews, btnRefresh, btnUndo, lblStatus, pageStatus);
             _transformer = new WallpaperTransformer();
@@ -119,6 +119,7 @@ namespace WallpaperSync.Application.Shell
             _viewCts?.Dispose();
             _viewCts = new CancellationTokenSource();
             var token = _viewCts.Token;
+            CoreLogger.Log("MainForm: indo para a próxima página.", LogLevel.Info);
             await _gridRenderer.NextPageAsync(lblStatus, pageStatus, token);
         }
 
@@ -128,6 +129,7 @@ namespace WallpaperSync.Application.Shell
             _viewCts?.Dispose();
             _viewCts = new CancellationTokenSource();
             var token = _viewCts.Token;
+            CoreLogger.Log("MainForm: indo para a página anterior.", LogLevel.Info);
             await _gridRenderer.PreviousPageAsync(lblStatus, pageStatus, token);
         }
 
@@ -145,7 +147,7 @@ namespace WallpaperSync.Application.Shell
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"{context} falhou: {ex.Message}");
+                CoreLogger.Log($"{context} falhou: {ex}", LogLevel.Error);
             }
         }
 
@@ -166,7 +168,7 @@ namespace WallpaperSync.Application.Shell
         {
             _ui.ToggleControls(false);
             _ui.SetStatus("Carregando catálogo...");
-            CoreLogger.Log("MainForm: iniciando recarregamento de catálogo.");
+            CoreLogger.Log("MainForm: iniciando recarregamento de catálogo.", LogLevel.Info);
 
             var loaded = false;
 
@@ -176,12 +178,12 @@ namespace WallpaperSync.Application.Shell
                 _visible = _catalog;
                 PopulateCategories();
                 loaded = true;
-                CoreLogger.Log($"MainForm: catálogo carregado com {_catalog.Count} itens.");
+                CoreLogger.Log($"MainForm: catálogo carregado com {_catalog.Count} itens.", LogLevel.Info);
             }
             catch (Exception ex)
             {
                 _ui.SetStatus("Falha ao carregar catálogo");
-                CoreLogger.Log($"MainForm: falha ao carregar catálogo: {ex.Message}");
+                CoreLogger.Log($"MainForm: falha ao carregar catálogo: {ex.Message}", LogLevel.Error);
                 MessageBox.Show($"Erro ao carregar catálogo: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -217,6 +219,7 @@ namespace WallpaperSync.Application.Shell
             finally
             {
                 _isPopulatingCategories = false;
+                CoreLogger.Log($"MainForm: categorias adicionadas ({listCategories.Items.Count} categorias).", LogLevel.Debug);
             }
         }
 
@@ -234,6 +237,7 @@ namespace WallpaperSync.Application.Shell
                 ? _catalog
                 : _catalog.Where(i => string.Equals(i.Category, category, StringComparison.OrdinalIgnoreCase)).ToList();
 
+            CoreLogger.Log($"MainForm: categoria aplicada: '{_currentCategory}' ({_visible.Count} itens).", LogLevel.Info);
             await RefreshViewAsync();
             ToggleHamburger();
         }
@@ -250,10 +254,12 @@ namespace WallpaperSync.Application.Shell
 
             if (chkShowPreviews.Checked)
             {
+                CoreLogger.Log("MainForm: renderizando grade", LogLevel.Debug);
                 await _gridRenderer.SetItemsAsync(_visible, lblStatus, pageStatus, token);
             }
             else
             {
+                CoreLogger.Log("MainForm: renderizando lista", LogLevel.Debug);
                 PopulateListBox();
                 _ui.SetPage("");
             }
@@ -292,25 +298,25 @@ namespace WallpaperSync.Application.Shell
             try
             {
                 var path = await _imageCache.EnsureOriginalAsync(item);
-                CoreLogger.Log($"MainForm: preview solicitado para {item.Name}");
+                CoreLogger.Log($"MainForm: preview solicitado para {item.Name}", LogLevel.Info);
 
                 using var preview = new PreviewForm(item.Name, path);
                 var choice = preview.ShowDialog(this);
 
                 if (choice == DialogResult.Yes)
                 {
-                    CoreLogger.Log($"MainForm: aplicando {item.Name} imediatamente.");
+                    CoreLogger.Log($"MainForm: aplicando {item.Name} imediatamente.", LogLevel.Info);
                     await ApplyWallpaperAsync(path);
                 }
                 else if (choice == DialogResult.OK)
                 {
-                    CoreLogger.Log($"MainForm: aplicando {item.Name} depois (via TranscodedWallpaper).");
+                    CoreLogger.Log($"MainForm: aplicando {item.Name} depois (via TranscodedWallpaper).", LogLevel.Info);
                     await ApplyLaterAsync(path);
                 }
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"MainForm: erro ao preparar wallpaper {item.Name}: {ex.Message}");
+                CoreLogger.Log($"MainForm: erro ao preparar wallpaper {item.Name}: {ex.Message}", LogLevel.Error);
                 MessageBox.Show($"Erro ao preparar wallpaper: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -325,12 +331,12 @@ namespace WallpaperSync.Application.Shell
             var applied = await _workflow.ApplyAsync(path).ConfigureAwait(false);
             if (!applied)
             {
-                CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.");
+                CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.", LogLevel.Warning);
                 Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
             }
             else
             {
-                CoreLogger.Log("MainForm: wallpaper aplicado com sucesso.");
+                CoreLogger.Log("MainForm: wallpaper aplicado com sucesso.", LogLevel.Info);
             }
         }
 
@@ -340,12 +346,12 @@ namespace WallpaperSync.Application.Shell
             var applied = _applier.ApplyViaTranscodedWallpaper(path);
             if (!applied)
             {
-                CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.");
+                CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.", LogLevel.Warning);
                 Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
             }
             else
             {
-                CoreLogger.Log("MainForm: wallpaper copiado com sucesso.");
+                CoreLogger.Log("MainForm: wallpaper copiado com sucesso.", LogLevel.Info);
             }
         }
 
@@ -357,6 +363,8 @@ namespace WallpaperSync.Application.Shell
                 panelHamburguer.Visible = true;
             }
             _slideTimer.Start();
+            CoreLogger.Log($"MainForm: alternando menu hamburguer. Novo estado: {(_hamburgerOpen ? "aberto" : "fechado")}", LogLevel.Debug);
+
         }
 
         private void AnimateHamburger()
@@ -379,6 +387,7 @@ namespace WallpaperSync.Application.Shell
 
         private void OnFormClosing(object? sender, FormClosingEventArgs e)
         {
+            CoreLogger.Log("MainForm: fechando e liberando recursos...", LogLevel.Info);
             _viewCts?.Cancel();
             _viewCts?.Dispose();
             _thumbnailService.Dispose();
