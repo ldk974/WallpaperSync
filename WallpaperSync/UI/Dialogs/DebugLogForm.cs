@@ -23,6 +23,9 @@ namespace WallpaperSync.UI.Dialogs
         private SmoothListBox navList;
         private Panel contentPanel;
         private Panel dividerLine;
+        private Panel logsPanel;
+        private Panel connectionPanel;
+        private Panel perfPanel;
 
         private Label levelLabel;
         private ComboBox logLevelCombo;
@@ -31,7 +34,6 @@ namespace WallpaperSync.UI.Dialogs
         private Button exportLogsBtn;
         private Button clearLogsBtn;
         private RichTextBox txtLog;
-        private bool logsPanelInitialized = false;
 
         private CartesianChart ramChart;
         private LineSeries<double> ramLineSeries;
@@ -44,13 +46,11 @@ namespace WallpaperSync.UI.Dialogs
         private Label lblDownload;
         private Label lblWallpaperTime;
 
-        private bool performancePanelInitialized = false;
-
         public DebugLogForm()
         {
             Text = "Debug Tools";
-            Width = 720;
-            Height = 550;
+            ClientSize = new Size(720, 550);
+            MinimumSize = new Size(720, 550);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Color.FromArgb(15,15,15);
 
@@ -69,36 +69,38 @@ namespace WallpaperSync.UI.Dialogs
                 Font = new Font("Segoe UI", 14)
             };
 
-            navList.Items.AddRange(new object[]
-            {
-        "Logs",
-        "Conexão",
-        "Desempenho"
-            });
+            navList.Items.AddRange(new object[] { "Logs", "Conexão", "Desempenho" });
+            navList.SelectedIndex = 0;
 
-            // Linha divisória
-            dividerLine = new Panel()
-            {
-                Dock = DockStyle.Left,
-                Width = 1
-            };
+            // linha divisória
+            dividerLine = new Panel() { Dock = DockStyle.Left, Width = 1 };
 
             // Painel principal
             contentPanel = new Panel()
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20)
             };
+
+            logsPanel = new Panel() { Dock = DockStyle.Fill, Visible = true };
+            connectionPanel = new Panel() { Dock = DockStyle.Fill, Visible = false };
+            perfPanel = new Panel() { Dock = DockStyle.Fill, Visible = false };
+
+            contentPanel.Controls.Add(logsPanel);
+            contentPanel.Controls.Add(connectionPanel);
+            contentPanel.Controls.Add(perfPanel);
 
             Controls.Add(contentPanel);
             Controls.Add(dividerLine);
             Controls.Add(navList);
 
             navList.SelectedIndexChanged += NavList_SelectedIndexChanged;
-            navList.SelectedIndex = 0;
 
             LoadLogsPanel();
+            LoadConnectionPanel();
+            LoadPerformancePanel();
         }
+
+
         private void ApplyTheme()
         {
             bool dark = ThemeManager.IsDarkMode();
@@ -114,29 +116,25 @@ namespace WallpaperSync.UI.Dialogs
             dividerLine.BackColor = divider;
 
             contentPanel.BackColor = back;
+            
+            levelLabel.ForeColor = fore;
 
-            // Se o painel de logs já existe, aplica tema também
-            if (logsPanelInitialized)
-            {
-                levelLabel.ForeColor = fore;
+            logLevelCombo.BackColor = back;
+            logLevelCombo.ForeColor = fore;
 
-                logLevelCombo.BackColor = back;
-                logLevelCombo.ForeColor = fore;
+            verboseCheck.ForeColor = fore;
 
-                verboseCheck.ForeColor = fore;
+            searchBox.BackColor = back;
+            searchBox.ForeColor = fore;
 
-                searchBox.BackColor = back;
-                searchBox.ForeColor = fore;
+            exportLogsBtn.BackColor = back;
+            exportLogsBtn.ForeColor = fore;
 
-                exportLogsBtn.BackColor = back;
-                exportLogsBtn.ForeColor = fore;
+            clearLogsBtn.BackColor = back;
+            clearLogsBtn.ForeColor = fore;
 
-                clearLogsBtn.BackColor = back;
-                clearLogsBtn.ForeColor = fore;
-
-                txtLog.BackColor = back;
-                txtLog.ForeColor = fore;
-            }
+            txtLog.BackColor = back;
+            txtLog.ForeColor = fore;
         }
         private void ApplyChartTheme()
         {
@@ -161,51 +159,37 @@ namespace WallpaperSync.UI.Dialogs
 
         private void NavList_SelectedIndexChanged(object sender, EventArgs e)
         {
-            contentPanel.Controls.Clear();
-
+            logsPanel.Visible = false;
+            connectionPanel.Visible = false;
+            perfPanel.Visible = false;
 
             switch (navList.SelectedItem.ToString())
             {
-                case "Logs": LoadLogsPanel(); break;
-                case "Conexão": LoadPlaceholder("Connection Panel"); break;
-                case "Desempenho": LoadPerformancePanel(); break;
-            }
-        }
+                case "Logs":
+                    logsPanel.Visible = true;
+                    break;
 
-        private void LoadPlaceholder(string text)
-        {
-            contentPanel.Controls.Add(new Label()
-            {
-                Text = text,
-                AutoSize = true,
-                Font = new Font("Segoe UI", 14)
-            });
+                case "Conexão":
+                    connectionPanel.Visible = true;
+                    break;
+
+                case "Desempenho":
+                    perfPanel.Visible = true;
+                    break;
+            }
         }
 
         private void LoadLogsPanel()
         {
-            if (logsPanelInitialized)  // já existe
-            {
-                ApplyTheme();
-                contentPanel.Controls.Add(levelLabel);
-                contentPanel.Controls.Add(logLevelCombo);
-                contentPanel.Controls.Add(verboseCheck);
-                contentPanel.Controls.Add(searchBox);
-                contentPanel.Controls.Add(txtLog);
-                contentPanel.Controls.Add(exportLogsBtn);
-                contentPanel.Controls.Add(clearLogsBtn);
-                return;
-            }
-
             levelLabel = new Label()
             {
                 AutoSize = true,
                 Text = "Nível:",
                 Left = 12,
                 Top = 20,
-                Font = new Font("Segoe UI", 14),
-                ForeColor = Color.Black
+                Font = new Font("Segoe UI", 14)
             };
+            logsPanel.Controls.Add(levelLabel);
 
             logLevelCombo = new ComboBox()
             {
@@ -213,82 +197,79 @@ namespace WallpaperSync.UI.Dialogs
                 Top = 20,
                 Width = 96,
                 Font = new Font("Segoe UI", 11),
-                BackColor = Color.FromArgb(15, 15, 15),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 FlatStyle = FlatStyle.Popup
             };
             logLevelCombo.Items.AddRange(new object[] { "INFO", "WARNING", "ERROR" });
             logLevelCombo.SelectedIndex = 0;
             logLevelCombo.SelectedIndexChanged += (s, e) => RenderLogs();
-
-            contentPanel.Controls.Add(logLevelCombo);
+            logsPanel.Controls.Add(logLevelCombo);
 
             verboseCheck = new CheckBox()
             {
                 Left = 181,
                 Top = 23,
                 Text = "Verbose",
-                Font = new Font("Segoe UI", 11),
-                ForeColor = Color.White
+                Font = new Font("Segoe UI", 11)
             };
             verboseCheck.CheckedChanged += (s, e) => RenderLogs();
-
-            contentPanel.Controls.Add(verboseCheck);
+            logsPanel.Controls.Add(verboseCheck);
 
             searchBox = new TextBox()
             {
                 Left = 16,
                 Top = 60,
-                Width = 410,
+                Width = logsPanel.Width - 32,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                Font = new Font("Segoe UI", 11),
-                BackColor = Color.FromArgb(15, 15, 15),
-                ForeColor = Color.White
+                Font = new Font("Segoe UI", 11)
             };
             searchBox.TextChanged += (s, e) => RenderLogs();
-
-            contentPanel.Controls.Add(searchBox);
+            logsPanel.Controls.Add(searchBox);
 
             txtLog = new RichTextBox()
             {
                 Left = 16,
                 Top = 100,
-                Width = contentPanel.Width -32,
-                Height = contentPanel.Height - 160,
+                Width = logsPanel.Width - 32,
+                Height = logsPanel.Height - 180,
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 ScrollBars = RichTextBoxScrollBars.Vertical,
                 Font = new Font("Consolas", 11),
-                ReadOnly = true,
-                Multiline = true,
-                BackColor = Color.FromArgb(15, 15, 15),
-                ForeColor = Color.White
+                ReadOnly = true
+            };
+            logsPanel.Controls.Add(txtLog);
+
+            var buttonsLayout = new TableLayoutPanel()
+            {
+                Left = 12,
+                Top = logsPanel.Height - 60,
+                Width = logsPanel.Width - 22,
+                Height = 40,
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                ColumnCount = 2
             };
 
-            contentPanel.Controls.Add(txtLog);
+            buttonsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            buttonsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            buttonsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+
+            logsPanel.Controls.Add(buttonsLayout);
 
             exportLogsBtn = new Button()
             {
-                Text = "Export Logs",
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                Width = 195,
-                Height = 35,
-                Left = 16,
-                Top = txtLog.Bottom + 12,
-                Font = new Font("Segoe UI", 11),
-                UseVisualStyleBackColor = true,
+                Text = "Exportar Logs",
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 11)
             };
+            buttonsLayout.Controls.Add(exportLogsBtn, 0, 0);
 
             clearLogsBtn = new Button()
             {
-                Text = "Clear",
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
-                Width = 195,
-                Height = 35,
-                Left = exportLogsBtn.Right + 15,
-                Top = txtLog.Bottom + 12,
-                Font = new Font("Segoe UI", 11),
-                UseVisualStyleBackColor = true
+                Text = "Limpar Log",
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 11)
             };
+            buttonsLayout.Controls.Add(clearLogsBtn, 1, 0);
 
             clearLogsBtn.Click += (s, e) =>
             {
@@ -316,22 +297,11 @@ namespace WallpaperSync.UI.Dialogs
                 }
             };
 
-            contentPanel.Controls.Add(exportLogsBtn);
-            contentPanel.Controls.Add(clearLogsBtn);
-
-            logsPanelInitialized = true;
+            ApplyTheme();
         }
 
         private async void LoadPerformancePanel()
         {
-            if (performancePanelInitialized)
-            {
-                contentPanel.Controls.Add(lblDownload);
-                contentPanel.Controls.Add(lblWallpaperTime);
-                contentPanel.Controls.Add(ramChart);
-                return;
-            }
-
             lblDownload = new Label()
             {
                 Text = "Tempo médio de download: 0.0ms (placeholder)",
@@ -341,6 +311,7 @@ namespace WallpaperSync.UI.Dialogs
                 Font = new Font("Segoe UI", 12),
                 ForeColor = ThemeManager.IsDarkMode() ? Color.White : Color.Black
             };
+            perfPanel.Controls.Add(lblDownload);
 
             lblWallpaperTime = new Label()
             {
@@ -351,25 +322,41 @@ namespace WallpaperSync.UI.Dialogs
                 Font = new Font("Segoe UI", 12),
                 ForeColor = ThemeManager.IsDarkMode() ? Color.White : Color.Black
             };
+            perfPanel.Controls.Add(lblWallpaperTime);
 
-            // inicia objetos pesados sem travar UI
+            // inicia objetos pesados sem travar ui
             await Task.Run(() => PrepareChartObjects());
 
-            // cria o controle no thread da UI
-            CreateChartControl();
-
-            // labels
-            contentPanel.Controls.Add(lblDownload);
-            contentPanel.Controls.Add(lblWallpaperTime);
-            contentPanel.Controls.Add(ramChart);
+            ramChart = new CartesianChart()
+            {
+                Series = ramSeries,
+                XAxes = ramXAxis,
+                YAxes = ramYAxis,
+                Left = 10,
+                Top = 80,
+                Width = perfPanel.Width - 40,
+                Height = perfPanel.Height - 120,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+            };
+            perfPanel.Controls.Add(ramChart);
 
             // timer
             StartRamTimer();
-
-            performancePanelInitialized = true;
-
             ApplyChartTheme();
         }
+
+        private void LoadConnectionPanel()
+        {
+            connectionPanel.Controls.Add(new Label()
+            {
+                Text = "Painel de conexão (em construção)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 14),
+                Left = 20,
+                Top = 20
+            });
+        }
+
 
         private void PrepareChartObjects()
         {
@@ -382,7 +369,7 @@ namespace WallpaperSync.UI.Dialogs
                 Fill = null
             };
 
-            SKColor gray = new SKColor(70, 70, 70);
+            SKColor gray = new SKColor(100, 100, 100);
 
             ramSeries = new ISeries[]
             {
@@ -391,27 +378,12 @@ namespace WallpaperSync.UI.Dialogs
 
             ramXAxis = new Axis[]
             {
-        new Axis { Name = "Tempo (s)", TextSize = 12 }
+        new Axis { Name = "Tempo (s)", TextSize = 12, NamePaint = new SolidColorPaint(gray) }
             };
 
             ramYAxis = new Axis[]
             {
-        new Axis { Name = "RAM usada (MB)", TextSize = 12, NamePaint = new SolidColorPaint(gray) }
-            };
-        }
-
-        private void CreateChartControl()
-        {
-            ramChart = new CartesianChart
-            {
-                Series = ramSeries,
-                XAxes = ramXAxis,
-                YAxes = ramYAxis,
-                Left = 10,
-                Top = 80,
-                Width = contentPanel.Width - 40,
-                Height = contentPanel.Height - 120,
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+        new Axis { Name = "RAM usada (MB)", TextSize = 12, NamePaint = new SolidColorPaint(gray), Labeler = value => value.ToString("F1") }
             };
         }
 

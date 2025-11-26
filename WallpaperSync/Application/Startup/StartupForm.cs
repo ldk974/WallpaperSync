@@ -44,11 +44,15 @@ namespace WallpaperSync.Application.Startup
 
         private void StartupForm_Load(object? sender, EventArgs e)
         {
-#if DEBUG
-            var logForm = new DebugLogForm();
-            logForm.Show();
-            CoreLogger.Log("WallpaperSync iniciado em DEBUG.", LogLevel.Debug);
-#endif
+            var Settings = SettingsManager.Load();
+
+            if (Settings.DebugMode)
+            {
+                var logForm = new DebugLogForm();
+                logForm.Show();
+                CoreLogger.Log("WallpaperSync iniciado em DEBUG.", LogLevel.Debug);
+            }
+
             CoreLogger.Log("StartupForm carregado e tema aplicado.", LogLevel.Info);
             ThemeManager.ApplyTheme(this);
         }

@@ -9,6 +9,10 @@ namespace WallpaperSync.Infrastructure.Environment
     /// </summary>
     public sealed class AppEnvironment
     {
+        private static AppEnvironment _instance;
+        public static AppEnvironment Instance =>
+            _instance ??= CreateDefault();
+
         private AppEnvironment(string appDataRoot)
         {
             AppDataRoot = appDataRoot;
