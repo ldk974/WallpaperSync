@@ -11,11 +11,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using WallpaperSync.Domain.Models;
 using WallpaperSync.Infrastructure.Logging;
+using WallpaperSync.UI.Dialogs;
 
 namespace WallpaperSync.Infrastructure.Services
 {
     public sealed class ThumbnailService : IDisposable
     {
+        public static ThumbnailService Instance { get; private set; }
+
         private readonly ImageCacheService _cache;
         private readonly string _thumbRoot;
         private readonly SemaphoreSlim _limiter;
@@ -23,6 +26,15 @@ namespace WallpaperSync.Infrastructure.Services
         private readonly SemaphoreSlim _ioLimiter;
         private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _inflight =
             new(StringComparer.OrdinalIgnoreCase);
+
+        private long _totalDownloadTimeMs = 0;
+        private int _downloadCount = 0;
+        private int _updateEvery = 6;
+
+        private System.Timers.Timer _avgTimer;
+
+        // evento que é disparado a cada download concluído
+        public event Action<double>? DownloadAverageUpdated;
 
         public ThumbnailService(ImageCacheService cache, string cacheRoot, int concurrency = 4)
         {
@@ -39,6 +51,7 @@ namespace WallpaperSync.Infrastructure.Services
             _limiter = new SemaphoreSlim(limit);
             _downloadLimiter = new SemaphoreSlim(downloadLimit);
             _ioLimiter = new SemaphoreSlim(ioLimit);
+
         }
 
         public Task<string> GetOrCreateAsync(WallpaperItem item, int width = 150, int height = 84, CancellationToken token = default)
@@ -86,15 +99,16 @@ namespace WallpaperSync.Infrastructure.Services
                     {
                         var bytes = await _cache.DownloadBytesAsync(item.ThumbnailUrl, token).ConfigureAwait(false);
                         _downloadLimiter.Release();
-                        swDownload.Stop();
 
                         if (bytes != null && bytes.Length > 0)
                         {
                             await _ioLimiter.WaitAsync(token).ConfigureAwait(false);
                             await File.WriteAllBytesAsync(destination, bytes, token).ConfigureAwait(false);
                             _ioLimiter.Release();
+                            swDownload.Stop();
+                            RegisterDownloadTime(swDownload.ElapsedMilliseconds);
 
-                            //CoreLogger.Log($"ThumbnailService: salvo thumbnail remota {destination} " + $"(download: {swDownload.ElapsedMilliseconds} ms, total: {swTotal.ElapsedMilliseconds} ms)");
+                            CoreLogger.Log($"ThumbnailService: salvo thumbnail remota {destination} " + $"(download: {swDownload.ElapsedMilliseconds} ms, total: {swTotal.ElapsedMilliseconds} ms)", LogLevel.Debug);
 
                             return destination;
                         }
@@ -138,6 +152,20 @@ namespace WallpaperSync.Infrastructure.Services
                 if (acquired)
                     _limiter.Release();
             }
+        }
+
+        private void RegisterDownloadTime(long elapsedMs)
+        {
+
+            Interlocked.Add(ref _totalDownloadTimeMs, elapsedMs);
+            var count = Interlocked.Increment(ref _downloadCount);
+
+            if (count % _updateEvery != 0)
+                return;
+
+            double media = (double)_totalDownloadTimeMs / _downloadCount;
+            // dispara evento
+            DownloadAverageUpdated?.Invoke(media);
         }
 
         private static async Task<Bitmap> LoadBitmapAsync(string path)

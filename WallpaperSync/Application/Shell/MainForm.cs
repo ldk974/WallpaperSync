@@ -63,7 +63,7 @@ namespace WallpaperSync.Application.Shell
             var http = HttpClientProvider.Shared;
             _catalogService = new CatalogService(http);
             _imageCache = new ImageCacheService(http, _env.CacheRoot);
-            _thumbnailService = new ThumbnailService(_imageCache, _env.CacheRoot, concurrency: 4);
+            _thumbnailService = AppEnvironment.ThumbnailService;
             _gridRenderer = new GridRenderer(flpGrid, _thumbnailService, HandleThumbnailClickAsync);
             _ui = new UiService(this, chkShowPreviews, btnRefresh, btnUndo, lblStatus, pageStatus);
             _transformer = new WallpaperTransformer();

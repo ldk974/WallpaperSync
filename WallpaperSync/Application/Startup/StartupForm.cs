@@ -23,11 +23,11 @@ namespace WallpaperSync.Application.Startup
         private readonly BackupService _backupService;
         private readonly WallpaperApplier _applier;
         private readonly WallpaperWorkflow _workflow;
-
+       
         public StartupForm()
         {
             InitializeComponent();
-
+            
             _env = AppEnvironment.CreateDefault();
             _env.Ensure();
 
@@ -37,6 +37,9 @@ namespace WallpaperSync.Application.Startup
             _backupService = new BackupService(_env.BackupRoot);
             _applier = new WallpaperApplier(_env.TranscodedWallpaper);
             _workflow = new WallpaperWorkflow(new WallpaperTransformer(), _backupService, _applier, _env.TranscodedWallpaper);
+
+            AppEnvironment.ThumbnailService = new ThumbnailService(_cache, _env.CacheRoot);
+
 
             Load += StartupForm_Load;
             FormClosing += StartupForm_FormClosing;

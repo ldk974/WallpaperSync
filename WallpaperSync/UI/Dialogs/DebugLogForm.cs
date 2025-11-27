@@ -9,7 +9,9 @@ using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 using WallpaperSync.Domain.Models;
+using WallpaperSync.Infrastructure.Environment;
 using WallpaperSync.Infrastructure.Logging;
+using WallpaperSync.Infrastructure.Services;
 using WallpaperSync.UI.Components;
 
 namespace WallpaperSync.UI.Dialogs
@@ -19,6 +21,7 @@ namespace WallpaperSync.UI.Dialogs
         public static DebugLogForm Instance { get; private set; }
         private readonly List<(DateTime time, LogLevel level, string message)> logEntries
     = new List<(DateTime, LogLevel, string)>();
+        private ThumbnailService _thumbnailService;
 
         private SmoothListBox navList;
         private Panel contentPanel;
@@ -40,7 +43,6 @@ namespace WallpaperSync.UI.Dialogs
         private ISeries[] ramSeries;
         private Axis[] ramXAxis;
         private Axis[] ramYAxis;
-        private PerformanceCounter ramCounter;
         private System.Windows.Forms.Timer ramTimer;
 
         private Label lblDownload;
@@ -55,7 +57,6 @@ namespace WallpaperSync.UI.Dialogs
             BackColor = Color.FromArgb(15,15,15);
 
             InitializeLayout();
-            ApplyTheme();
             Instance = this;
         }
         private void InitializeLayout()
@@ -333,7 +334,7 @@ namespace WallpaperSync.UI.Dialogs
                 XAxes = ramXAxis,
                 YAxes = ramYAxis,
                 Left = 10,
-                Top = 80,
+                Top = 110,
                 Width = perfPanel.Width - 40,
                 Height = perfPanel.Height - 120,
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -490,5 +491,36 @@ namespace WallpaperSync.UI.Dialogs
             txtLog.ScrollToCaret();
             txtLog.ResumeLayout();
         }
+        private void OnDownloadAverageUpdated(double media)
+        {
+            CoreLogger.Log("Evento recebido: média =" + media, LogLevel.Warning);
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => OnDownloadAverageUpdated(media)));
+                return;
+            }
+
+            lblDownload.Text = $"Tempo médio de download: {media:F1} ms";
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+
+            // Obtém o serviço agora que a app já terminou de iniciar tudo
+            _thumbnailService = AppEnvironment.ThumbnailService;
+
+            if (_thumbnailService == null)
+            {
+                CoreLogger.Log("ThumbnailService ainda não carregado no OnShown!", LogLevel.Error);
+                return;
+            }
+
+            CoreLogger.Log("Assinando evento de média de download...", LogLevel.Warning);
+
+            _thumbnailService.DownloadAverageUpdated += OnDownloadAverageUpdated;
+        }
+
     }
 }

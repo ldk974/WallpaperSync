@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using WallpaperSync.Infrastructure.Logging;
+using WallpaperSync.Infrastructure.Services;
 
 namespace WallpaperSync.Infrastructure.Environment
 {
@@ -27,6 +28,7 @@ namespace WallpaperSync.Infrastructure.Environment
         public string CacheRoot { get; }
         public string BackupRoot { get; }
         public string TranscodedWallpaper { get; }
+        public static ThumbnailService? ThumbnailService { get; set; }
 
         public static AppEnvironment CreateDefault()
         {
