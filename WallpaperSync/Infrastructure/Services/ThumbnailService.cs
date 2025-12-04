@@ -115,7 +115,7 @@ namespace WallpaperSync.Infrastructure.Services
                     } 
                     catch (Exception ex)
                     { 
-                        CoreLogger.Log($"ThumbnailService: falha ao baixar thumbnail remota {item.ThumbnailUrl}: {ex.Message}");
+                        CoreLogger.Log($"ThumbnailService: Erro ao baixar thumbnail remota {item.ThumbnailUrl}: {ex.Message}");
                     }
                     
                     

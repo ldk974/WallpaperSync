@@ -26,7 +26,7 @@ namespace WallpaperSync.Infrastructure.SystemIntegration
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"WallpaperApplier.ApplyViaApi falhou: {ex.Message}");
+                CoreLogger.Log($"WallpaperApplier: ApplyViaApi falhou: {ex.Message}");
                 return false;
             }
         }
@@ -39,7 +39,7 @@ namespace WallpaperSync.Infrastructure.SystemIntegration
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"ApplyViaTranscodedWallpaper copy falhou: {ex.Message}");
+                CoreLogger.Log($"WallpaperApplier: ApplyViaTranscodedWallpaper copy falhou: {ex.Message}");
                 return false;
             }
 
@@ -50,7 +50,7 @@ namespace WallpaperSync.Infrastructure.SystemIntegration
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"ApplyViaTranscodedWallpaper registry falhou: {ex.Message}");
+                CoreLogger.Log($"WallpaperApplier: ApplyViaTranscodedWallpaper registry falhou: {ex.Message}");
                 return false;
             }
 

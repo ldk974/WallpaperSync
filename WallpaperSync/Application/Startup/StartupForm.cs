@@ -23,7 +23,8 @@ namespace WallpaperSync.Application.Startup
         private readonly BackupService _backupService;
         private readonly WallpaperApplier _applier;
         private readonly WallpaperWorkflow _workflow;
-       
+        private readonly PerformanceMonitor _performanceMonitor;
+
         public StartupForm()
         {
             InitializeComponent();
@@ -37,6 +38,7 @@ namespace WallpaperSync.Application.Startup
             _backupService = new BackupService(_env.BackupRoot);
             _applier = new WallpaperApplier(_env.TranscodedWallpaper);
             _workflow = new WallpaperWorkflow(new WallpaperTransformer(), _backupService, _applier, _env.TranscodedWallpaper);
+            _performanceMonitor = new PerformanceMonitor();
 
             AppEnvironment.ThumbnailService = new ThumbnailService(_cache, _env.CacheRoot);
 
@@ -51,7 +53,10 @@ namespace WallpaperSync.Application.Startup
 
             if (Settings.DebugMode)
             {
-                var logForm = new DebugLogForm();
+                var logService = new LogService();
+                CoreLogger.LogService = logService;
+
+                var logForm = new DebugLogForm(logService, _performanceMonitor);
                 logForm.Show();
                 CoreLogger.Log("WallpaperSync iniciado em DEBUG.", LogLevel.Debug);
             }
@@ -69,17 +74,17 @@ namespace WallpaperSync.Application.Startup
 
         private void btnUseDefault_Click(object sender, EventArgs e)
         {
-            CoreLogger.Log("Usuário selecionou: Repositório padrão.", LogLevel.Info);
+            CoreLogger.Log("StartupForm: Usuário selecionou: Repositório padrão.", LogLevel.Info);
             var main = new MainForm(this);
             Hide();
             main.Show();
 
-            CoreLogger.Log("MainForm exibido com sucesso.", LogLevel.Debug);
+            CoreLogger.Log("StartupForm: MainForm exibido com sucesso.", LogLevel.Debug);
         }
 
         private async void btnUseFile_Click(object sender, EventArgs e)
         {
-            CoreLogger.Log("Usuário selecionou: Escolher arquivo.", LogLevel.Info);
+            CoreLogger.Log("StartupForm: Usuário selecionou: Escolher arquivo.", LogLevel.Info);
 
             using var ofd = new OpenFileDialog
             {
@@ -89,12 +94,12 @@ namespace WallpaperSync.Application.Startup
 
             if (ofd.ShowDialog() != DialogResult.OK)
             {
-                CoreLogger.Log("Nenhum arquivo selecionado pelo usuário.", LogLevel.Warning);
+                CoreLogger.Log("StartupForm: Nenhum arquivo selecionado pelo usuário.", LogLevel.Warning);
                 return;
             }
 
             string path = ofd.FileName;
-            CoreLogger.Log($"Arquivo selecionado: {path}", LogLevel.Debug);
+            CoreLogger.Log($"StartupForm: Arquivo selecionado: {path}", LogLevel.Debug);
 
             TaskDialogButton nowButton = new ("Aplicar agora");
             TaskDialogButton laterButton = new ("Aplicar ao reiniciar");
@@ -111,40 +116,38 @@ namespace WallpaperSync.Application.Startup
 
             if (result == nowButton)
             {
-                CoreLogger.Log("Usuário escolheu: Aplicar agora.", LogLevel.Info);
+                CoreLogger.Log("StartupForm: Usuário escolheu: Aplicar agora.", LogLevel.Info);
 
                 var applied = await _workflow.ApplyAsync(path).ConfigureAwait(false);
                 if (!applied)
                 {
-                    CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.", LogLevel.Error);
-                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    Invoke(() => MessageBox.Show($"Erro ao aplicar o wallpaper: Código {ErrorCodes.START_WorkflowApplyFailed}", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
                 }
                 else
                 {
-                    CoreLogger.Log("MainForm: wallpaper aplicado com sucesso.", LogLevel.Info);
+                    CoreLogger.Log("StartupForm: wallpaper aplicado com sucesso.", LogLevel.Info);
                 }
             }
             else if (result == laterButton)
             {
-                CoreLogger.Log("Usuário escolheu: Aplicar ao reiniciar.", LogLevel.Info);
+                CoreLogger.Log("StartupForm: Usuário escolheu: Aplicar ao reiniciar.", LogLevel.Info);
 
                 _backupService.CreateBackupIfExists(_env.TranscodedWallpaper);
                 var applied = _applier.ApplyViaTranscodedWallpaper(path);
                 if (!applied)
                 {
-                    CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.", LogLevel.Error);
-                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    Invoke(() => MessageBox.Show($"Erro ao copiar o wallpaper: Código`{ErrorCodes.START_CopyViaTranscodedFailed}", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
                 }
                 else
                 {
-                    CoreLogger.Log("MainForm: wallpaper copiado com sucesso.", LogLevel.Info);
+                    CoreLogger.Log("StartupForm: wallpaper copiado com sucesso.", LogLevel.Info);
                 }
             }
         }
 
         private async void btnUseUrl_Click(object sender, EventArgs e)
         {
-            CoreLogger.Log("Usuário selecionou: Aplicar wallpaper via URL.", LogLevel.Info);
+            CoreLogger.Log("StartupForm: Usuário selecionou: Aplicar wallpaper via URL.", LogLevel.Info);
 
             var url = Microsoft.VisualBasic.Interaction.InputBox(
                 "Digite a URL da imagem:",
@@ -153,11 +156,11 @@ namespace WallpaperSync.Application.Startup
 
             if (string.IsNullOrWhiteSpace(url))
             {
-                CoreLogger.Log("URL vazia ou inválida informada pelo usuário.", LogLevel.Warning);
+                CoreLogger.Log("StartupForm: URL vazia ou inválida informada pelo usuário.", LogLevel.Warning);
                 return;
             }
 
-            CoreLogger.Log($"URL informada: {url}", LogLevel.Debug);
+            CoreLogger.Log($"StartupForm: URL informada: {url}", LogLevel.Debug);
 
             var saved = await _cache.SaveCustomAsync(url);
 
@@ -176,45 +179,43 @@ namespace WallpaperSync.Application.Startup
 
             if (result == nowButton)
             {
-                CoreLogger.Log("Usuário escolheu: Aplicar agora.", LogLevel.Info);
+                CoreLogger.Log("StartupForm: Usuário escolheu: Aplicar agora.", LogLevel.Info);
 
                 var applied = await _workflow.ApplyAsync(saved).ConfigureAwait(false);
                 if (!applied)
                 {
-                    CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.", LogLevel.Error);
-                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    Invoke(() => MessageBox.Show($"Erro ao aplicar o wallpaper: Código {ErrorCodes.START_WorkflowApplyFailed}", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
                 }
                 else
                 {
-                    CoreLogger.Log("MainForm: wallpaper aplicado com sucesso.", LogLevel.Info);
+                    CoreLogger.Log("StartupForm: wallpaper aplicado com sucesso.", LogLevel.Info);
                 }
             }
             else if (result == laterButton)
             {
-                CoreLogger.Log("Usuário escolheu: Aplicar ao reiniciar.", LogLevel.Info);
+                CoreLogger.Log("StartupForm: Usuário escolheu: Aplicar ao reiniciar.", LogLevel.Info);
 
                 _backupService.CreateBackupIfExists(_env.TranscodedWallpaper);
                 var applied = _applier.ApplyViaTranscodedWallpaper(saved);
                 if (!applied)
                 {
-                    CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.", LogLevel.Error);
-                    Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                    Invoke(() => MessageBox.Show($"Erro ao copiar o wallpaper: Código {ErrorCodes.START_CopyViaTranscodedFailed}", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
                 }
                 else
                 {
-                    CoreLogger.Log("MainForm: wallpaper copiado com sucesso.", LogLevel.Info);
+                    CoreLogger.Log("StartupForm: wallpaper copiado com sucesso.", LogLevel.Info);
                 }
             }
         }
 
         private void btnRestore_Click(object sender, EventArgs e)
         {
-            CoreLogger.Log("Usuário abriu o menu de restauração.", LogLevel.Info);
+            CoreLogger.Log("StartupForm: Usuário abriu o menu de restauração.", LogLevel.Info);
 
             var restore = new RestoreForm(_undoManager, _env.TranscodedWallpaper);
             restore.Show(this);
 
-            CoreLogger.Log("RestoreForm exibido.", LogLevel.Debug);
+            CoreLogger.Log("StartupForm: RestoreForm exibido.", LogLevel.Debug);
         }
     }
 }

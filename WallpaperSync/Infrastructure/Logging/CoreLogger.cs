@@ -1,29 +1,21 @@
+using OpenTK.Graphics.ES10;
 using System.Diagnostics;
+using WallpaperSync.Infrastructure.Services;
 using WallpaperSync.UI.Dialogs;
 
 namespace WallpaperSync.Infrastructure.Logging
 {
     public static class CoreLogger
     {
-        public static void Log(string message, LogLevel level = LogLevel.Info)
-        {
-#if DEBUG
-            try
-            {
-                DebugLogForm.Instance?.AppendLine(message, level);
-            }
-            catch
-            {
-                // ignored
-            }
-            Debug.WriteLine($"[{level}] {message}");
-#else
-            _ = message;
-#endif
-        }
+        public static ILogService LogService { get; set; }
 
-        public static void Log(Exception ex, string context)
-            => Log($"{context}: {ex}");
+        public static void Log(string message, LogLevel level = LogLevel.Info, int? errorCode = null)
+        {
+            string prefix = errorCode.HasValue ? $"[{errorCode}] " : "";
+            LogService?.Append(message, level);
+
+            Debug.WriteLine($"[{level}] {message}");
+        }
     }
     public enum LogLevel
     {

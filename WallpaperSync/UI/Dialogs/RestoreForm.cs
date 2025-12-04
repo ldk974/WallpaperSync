@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WallpaperSync.Infrastructure.Logging;
 using WallpaperSync.Infrastructure.Services;
 using WallpaperSync.Infrastructure.SystemIntegration;
 using WallpaperSync.UI.Components;
@@ -266,7 +267,7 @@ namespace WallpaperSync.UI.Dialogs
             }
             else
             {
-                MessageBox.Show($"Falha ao restaurar:");
+                MessageBox.Show($"Erro ao restaurar: Código {ErrorCodes.RESTORE_RestoreFailed}");
             }
         }
 
@@ -284,7 +285,7 @@ namespace WallpaperSync.UI.Dialogs
             }
             else
             {
-                MessageBox.Show($"Falha ao excluir: {err}");
+                MessageBox.Show($"Erro ao excluir: Código {ErrorCodes.RESTORE_DeleteFailed}");
             }
         }
 
@@ -320,7 +321,7 @@ namespace WallpaperSync.UI.Dialogs
             }
             else
             {
-                MessageBox.Show($"Falha ao restaurar:");
+                MessageBox.Show($"Erro ao restaurar Código: {ErrorCodes.RESTORE_RestoreFailed}");
             }
         }
 

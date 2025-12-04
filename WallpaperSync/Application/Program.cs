@@ -1,5 +1,7 @@
 using System.Globalization;
 using WallpaperSync.Application.Startup;
+using WallpaperSync.Infrastructure.Logging;
+using WallpaperSync.Infrastructure.Services;
 using WinFormsApplication = System.Windows.Forms.Application;
 
 namespace WallpaperSync 

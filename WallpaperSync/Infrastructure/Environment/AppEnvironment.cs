@@ -29,6 +29,7 @@ namespace WallpaperSync.Infrastructure.Environment
         public string BackupRoot { get; }
         public string TranscodedWallpaper { get; }
         public static ThumbnailService? ThumbnailService { get; set; }
+        public record LogEntry(DateTime Time, LogLevel Level, string Message);
 
         public static AppEnvironment CreateDefault()
         {

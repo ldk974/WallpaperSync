@@ -31,32 +31,32 @@ namespace WallpaperSync.Domain.Workflows
 
         public async Task<bool> ApplyAsync(string path, CancellationToken token = default)
         {
-            CoreLogger.Log($"Iniciando ApplyAsync para '{path}'.", LogLevel.Info);
+            CoreLogger.Log($"WallpaperWorkflow: Iniciando ApplyAsync para '{path}'.", LogLevel.Info);
 
             string? prepared = null;
             try
             {
                 prepared = await Task.Run(() => PrepareImage(path), token).ConfigureAwait(false);
-                CoreLogger.Log($"Imagem preparada em '{prepared}'.", LogLevel.Debug);
+                CoreLogger.Log($"WallpaperWorkflow: Imagem preparada em '{prepared}'.", LogLevel.Debug);
 
                 await BackupExistingAsync();
 
                 var copyOk = await CopyWithRetryAsync(prepared, _transcodedPath, token).ConfigureAwait(false);
                 if (!copyOk)
                 {
-                    CoreLogger.Log("Falha ao copiar imagem para TranscodedWallpaper após múltiplas tentativas.", LogLevel.Error);
+                    CoreLogger.Log("WallpaperWorkflow: Erro ao copiar imagem para TranscodedWallpaper após múltiplas tentativas.", LogLevel.Error);
                     return false;
                 }
 
-                CoreLogger.Log("Arquivo copiado para TranscodedWallpaper com sucesso.", LogLevel.Info);
+                CoreLogger.Log("WallpaperWorkflow: Arquivo copiado para TranscodedWallpaper com sucesso.", LogLevel.Info);
 
                 if (_applier.ApplyViaApi(_transcodedPath))
                 {
-                    CoreLogger.Log("Wallpaper aplicado via API com sucesso.", LogLevel.Info);
+                    CoreLogger.Log("WallpaperWorkflow: Wallpaper aplicado via API com sucesso.", LogLevel.Info);
                     return true;
                 }
 
-                CoreLogger.Log("Falha ao aplicar via API — tentando fallback para TranscodedWallpaper.", LogLevel.Warning);
+                CoreLogger.Log("WallpaperWorkflow: Erro ao aplicar via API — tentando fallback para TranscodedWallpaper.", LogLevel.Warning);
 
                 bool fallbackOk = _applier.ApplyViaTranscodedWallpaper(prepared);
                 CoreLogger.Log(
@@ -69,7 +69,7 @@ namespace WallpaperSync.Domain.Workflows
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"WallpaperWorkflow.ApplyAsync falhou: {ex}", LogLevel.Error);
+                CoreLogger.Log($"WallpaperWorkflow: ApplyAsync falhou: {ex}", LogLevel.Error);
                 return false;
             }
             finally
@@ -83,7 +83,7 @@ namespace WallpaperSync.Domain.Workflows
 
         private string PrepareImage(string path)
         {
-            CoreLogger.Log($"Preparando imagem '{path}'.", LogLevel.Debug);
+            CoreLogger.Log($"WallpaperWorkflow: Preparando imagem '{path}'.", LogLevel.Debug);
 
             using var original = _transformer.LoadUnlocked(path);
             using var cropped = _transformer.EnsureAspect(original);
@@ -112,7 +112,7 @@ namespace WallpaperSync.Domain.Workflows
                 }
                 catch (IOException ex)
                 {
-                    CoreLogger.Log($"Copy retry {attempt + 1}/{retries}: {ex.Message}");
+                    CoreLogger.Log($"WallpaperWorkflow: Copy retry {attempt + 1}/{retries}: {ex.Message}");
                     await Task.Delay(delayMs, token).ConfigureAwait(false);
                 }
             }
@@ -127,12 +127,12 @@ namespace WallpaperSync.Domain.Workflows
                 if (File.Exists(path))
                 {
                     File.Delete(path);
-                    CoreLogger.Log($"Arquivo temporário removido: '{path}'.", LogLevel.Debug);
+                    CoreLogger.Log($"WallpaperWorkflow: Arquivo temporário removido: '{path}'.", LogLevel.Debug);
                 }
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"Falha ao remover arquivo temporário '{path}': {ex.Message}", LogLevel.Warning);
+                CoreLogger.Log($"WallpaperWorkflow: Erro ao remover arquivo temporário '{path}': {ex.Message}", LogLevel.Warning);
             }
         }
     }

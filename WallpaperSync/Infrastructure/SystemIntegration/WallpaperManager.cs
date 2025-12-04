@@ -32,14 +32,14 @@ namespace WallpaperSync.Infrastructure.SystemIntegration
                 if (!result)
                 {
                     var error = Marshal.GetLastWin32Error();
-                    CoreLogger.Log($"SystemParametersInfo falhou: {error}");
+                    CoreLogger.Log($"WallpaperManager: SystemParametersInfo falhou: {error}");
                 }
 
                 return result;
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"WallpaperManager falhou: {ex.Message}");
+                CoreLogger.Log($"WallpaperManager: erro: {ex.Message}");
                 return false;
             }
         }

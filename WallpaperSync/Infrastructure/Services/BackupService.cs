@@ -24,12 +24,12 @@ namespace WallpaperSync.Infrastructure.Services
             try
             {
                 File.Copy(sourcePath, destination, overwrite: false);
-                CoreLogger.Log($"BackupService criou backup em: {destination}");
+                CoreLogger.Log($"BackupService: backup criado em: {destination}");
                 return destination;
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"BackupService falhou: {ex.Message}");
+                CoreLogger.Log($"BackupService: erro: {ex.Message}");
                 return null;
             }
         }

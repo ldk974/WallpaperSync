@@ -27,7 +27,7 @@ namespace WallpaperSync.Infrastructure.Services
 
         public async Task<IReadOnlyList<WallpaperItem>> LoadAsync(CancellationToken cancellationToken = default)
         {
-            CoreLogger.Log("CatalogService.LoadAsync iniciado", LogLevel.Info);
+            CoreLogger.Log("CatalogService: LoadAsync iniciado", LogLevel.Info);
 
             var catalog = new List<WallpaperItem>();
             var baseUrl = "https://ldk-ws.xyz/";
@@ -36,22 +36,22 @@ namespace WallpaperSync.Infrastructure.Services
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                CoreLogger.Log($"Carregando categoria '{folder}'.", LogLevel.Info);
+                CoreLogger.Log($"CatalogService: Carregando categoria '{folder}'.", LogLevel.Info);
 
                 var wallUrl = $"{baseUrl}wallpapers/{folder}/";
                 var thumbUrl = $"{baseUrl}thumbs/{folder}/";
 
-                CoreLogger.Log($"Solicitando lista de wallpapers: {wallUrl}", LogLevel.Debug);
+                CoreLogger.Log($"CatalogService: Solicitando lista de wallpapers: {wallUrl}", LogLevel.Debug);
                 var wallHtml = await TryGetString(wallUrl, cancellationToken) ?? string.Empty;
 
-                CoreLogger.Log($"Solicitando lista de thumbnails: {thumbUrl}", LogLevel.Debug);
+                CoreLogger.Log($"CatalogService: Solicitando lista de thumbnails: {thumbUrl}", LogLevel.Debug);
                 var thumbHtml = await TryGetString(thumbUrl, cancellationToken) ?? string.Empty;
 
                 var wallpaperFiles = ParseLinks(wallHtml);
                 var thumbSet = ParseLinks(thumbHtml).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                 CoreLogger.Log(
-    $"Categoria '{folder}': encontrados {wallpaperFiles.Count()} wallpapers e {thumbSet.Count} thumbs.",
+    $"CatalogService: Categoria '{folder}': encontrados {wallpaperFiles.Count()} wallpapers e {thumbSet.Count} thumbs.",
     LogLevel.Debug);
 
                 foreach (var fileServerName in wallpaperFiles)
@@ -69,13 +69,13 @@ namespace WallpaperSync.Infrastructure.Services
                 }
             }
 
-            CoreLogger.Log($"CatalogService carregou {catalog.Count} itens no total.", LogLevel.Info);
+            CoreLogger.Log($"CatalogService: {catalog.Count} itens carregados no total.", LogLevel.Info);
             return catalog;
         }
 
         public IReadOnlyList<string> BuildCategories(IEnumerable<WallpaperItem> items)
         {
-            CoreLogger.Log("CatalogService.BuildCategories iniciado.", LogLevel.Debug);
+            CoreLogger.Log("CatalogService: BuildCategories iniciado.", LogLevel.Debug);
 
             return items
                 .Select(i => i.Category)
@@ -94,7 +94,7 @@ namespace WallpaperSync.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"Erro ao acessar '{url}': {ex.Message}", LogLevel.Warning);
+                CoreLogger.Log($"CatalogService: Erro ao acessar '{url}': {ex.Message}", LogLevel.Warning);
                 return null;
             }
         }
@@ -103,7 +103,7 @@ namespace WallpaperSync.Infrastructure.Services
         {
             if (string.IsNullOrWhiteSpace(html))
             {
-                CoreLogger.Log("ParseLinks recebeu HTML vazio.", LogLevel.Warning);
+                CoreLogger.Log("CatalogService: ParseLinks recebeu HTML vazio.", LogLevel.Warning);
                 return Enumerable.Empty<string>();
             }
 

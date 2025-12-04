@@ -98,7 +98,7 @@ namespace WallpaperSync.Application.Shell
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Falha ao iniciar: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Erro ao iniciar: Código {ErrorCodes.MAIN_InitFailed}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -182,9 +182,8 @@ namespace WallpaperSync.Application.Shell
             }
             catch (Exception ex)
             {
-                _ui.SetStatus("Falha ao carregar catálogo");
-                CoreLogger.Log($"MainForm: falha ao carregar catálogo: {ex.Message}", LogLevel.Error);
-                MessageBox.Show($"Erro ao carregar catálogo: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _ui.SetStatus("Erro ao carregar catálogo");
+                MessageBox.Show($"Erro ao carregar catálogo: Código {ErrorCodes.MAIN_CatalogLoadFailed}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -298,14 +297,14 @@ namespace WallpaperSync.Application.Shell
             try
             {
                 var path = await _imageCache.EnsureOriginalAsync(item);
-                CoreLogger.Log($"MainForm: preview solicitado para {item.Name}", LogLevel.Info);
+                CoreLogger.Log($"MainForm: preview solicitado para \"{item.Name}\"", LogLevel.Info);
 
                 using var preview = new PreviewForm(item.Name, path);
                 var choice = preview.ShowDialog(this);
 
                 if (choice == DialogResult.Yes)
                 {
-                    CoreLogger.Log($"MainForm: aplicando {item.Name} imediatamente.", LogLevel.Info);
+                    CoreLogger.Log($"MainForm: aplicando \"{item.Name}\" imediatamente.", LogLevel.Info);
                     await ApplyWallpaperAsync(path);
                 }
                 else if (choice == DialogResult.OK)
@@ -316,8 +315,7 @@ namespace WallpaperSync.Application.Shell
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"MainForm: erro ao preparar wallpaper {item.Name}: {ex.Message}", LogLevel.Error);
-                MessageBox.Show($"Erro ao preparar wallpaper: {ex.Message}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Erro ao preparar wallpaper: Código {ErrorCodes.MAIN_PrepareWallpaperFailed}", "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -331,8 +329,7 @@ namespace WallpaperSync.Application.Shell
             var applied = await _workflow.ApplyAsync(path).ConfigureAwait(false);
             if (!applied)
             {
-                CoreLogger.Log("MainForm: workflow retornou falha ao aplicar wallpaper.", LogLevel.Warning);
-                Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                Invoke(() => MessageBox.Show($"Erro ao aplicar o wallpaper: Código {ErrorCodes.MAIN_WorkflowApplyFailed}", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
             }
             else
             {
@@ -346,8 +343,7 @@ namespace WallpaperSync.Application.Shell
             var applied = _applier.ApplyViaTranscodedWallpaper(path);
             if (!applied)
             {
-                CoreLogger.Log("MainForm: ApplyViaTranscodedWallpaper retornou falha ao copiar wallpaper.", LogLevel.Warning);
-                Invoke(() => MessageBox.Show("Não foi possível aplicar o wallpaper.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                Invoke(() => MessageBox.Show($"Erro ao copiar o wallpaper: Código {ErrorCodes.MAIN_CopyViaTranscodedFailed}", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning));
             }
             else
             {

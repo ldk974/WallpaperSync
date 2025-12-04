@@ -182,7 +182,7 @@ namespace WallpaperSync.UI.Components
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                CoreLogger.Log($"GridRenderer thumbnail falhou: {ex.Message}");
+                CoreLogger.Log($"GridRenderer: erro na thumbnail: {ex.Message}");
             }
             finally
             {

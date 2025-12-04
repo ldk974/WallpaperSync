@@ -49,7 +49,7 @@ namespace WallpaperSync.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                CoreLogger.Log($"UndoManager.Restore falhou: {ex.Message}");
+                CoreLogger.Log($"UndoManager: erro ao restaurar: {ex.Message}");
                 return false;
             }
         }
@@ -67,7 +67,7 @@ namespace WallpaperSync.Infrastructure.Services
             catch (Exception ex)
             {
                 error = ex.Message;
-                CoreLogger.Log($"UndoManager.Delete falhou: {ex}");
+                CoreLogger.Log($"UndoManager: erro ao apagar: {ex}");
                 return false;
             }
         }
